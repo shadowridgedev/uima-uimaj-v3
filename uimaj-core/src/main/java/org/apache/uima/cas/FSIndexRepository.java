@@ -21,7 +21,9 @@ package org.apache.uima.cas;
 
 import java.util.Iterator;
 
+import org.apache.uima.cas.impl.FSIndexRepositoryImpl;
 import org.apache.uima.cas.impl.LowLevelIndex;
+import org.apache.uima.jcas.cas.TOP;
 
 /**
  * Repository of indexes over feature structures. Use this interface to access previously defined
@@ -107,7 +109,8 @@ public interface FSIndexRepository {
    * Remove a feature structure from all indexes in the repository.
    * 
    * @param fs
-   *          The FS to be removed.
+   *          The FS to be removed.  The fs must be the exact FS to remove, not just one
+   *          which compares "equal" using the index's comparator.
    * @param <T> the generic type of the FeatureStructure
    * @exception NullPointerException
    *              If the <code>fs</code> parameter is <code>null</code>.
@@ -122,12 +125,32 @@ public interface FSIndexRepository {
   void removeAllIncludingSubtypes(Type type);
   
   /**
+   * Remove all instances of type, including all subtypes from all indexes in the repository view.
+   * @param clazz the JCas class of the type to remove.  To remove all use TOP.class
+   * @param <T> the type to remove
+   * @exception NullPointerException if the <code>clazz</code> parameter is <code>null</code>.
+  */
+  default <T extends TOP> void removeAllIncludingSubtypes(Class<T> clazz) {
+    removeAllIncludingSubtypes(((FSIndexRepositoryImpl)this).getCasImpl().getJCasImpl().getCasType(clazz));
+  }
+  
+  /**
    * Remove all instances of just this type, excluding subtypes, from all indexes in the repository view.
    * @param type the type to remove
    * @exception NullPointerException if the <code>type</code> parameter is <code>null</code>.
   */
   void removeAllExcludingSubtypes(Type type);
-  
+
+  /**
+   * Remove all instances of just this type, excluding subtypes, from all indexes in the repository view.
+   * @param clazz the JCas Class of the type to remove
+   * @param <T> the type to remove
+   * @exception NullPointerException if the <code>type</code> parameter is <code>null</code>.
+  */
+  default <T extends TOP> void removeAllExcludingSubtypes(Class<T> clazz) {
+    removeAllExcludingSubtypes(((FSIndexRepositoryImpl)this).getCasImpl().getJCasImpl().getCasType(clazz));
+  }
+
   /**
    * Gets an iterator over all indexed FeatureStructures of the specified Type (and any of its
    * subtypes).  The elements are returned in arbitrary order.
@@ -140,5 +163,21 @@ public interface FSIndexRepository {
    *         and its subtypes, in no particular order.
    */
   <T extends FeatureStructure> FSIterator<T> getAllIndexedFS(Type aType);
+  
+  /**
+   * Gets an iterator over all indexed FeatureStructures of the specified Type (and any of its
+   * subtypes).  The elements are returned in arbitrary order.
+   *
+   * Generics: T is the Java class for aType.
+   * @param clazz
+   *          The JCas class corresponding to the type
+   * @param <T> The Java class associated with aType
+   * @return An iterator that returns all indexed FeatureStructures of the specified type
+   *         and its subtypes, in no particular order.
+   */
+  default <T extends FeatureStructure> FSIterator<T> getAllIndexedFS(Class<T> clazz) {
+    return getAllIndexedFS(((FSIndexRepositoryImpl)this).getCasImpl().getJCasImpl().getCasType(clazz));
+  }
+  
   
 }

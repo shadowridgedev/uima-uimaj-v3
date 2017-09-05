@@ -26,6 +26,7 @@ import java.util.Spliterator;
 import java.util.function.DoubleConsumer;
 import java.util.stream.DoubleStream;
 
+import org.apache.uima.cas.CAS;
 import org.apache.uima.cas.CommonArrayFS;
 import org.apache.uima.cas.impl.CASImpl;
 import org.apache.uima.cas.impl.DoubleArrayFSImpl;
@@ -37,7 +38,7 @@ import org.apache.uima.jcas.JCasRegistry;
 public final class DoubleArray extends TOP implements CommonPrimitiveArray, DoubleArrayFSImpl, Iterable<Double> {
 
   /* public static string for use where constants are needed, e.g. in some Java Annotations */
-  public final static String _TypeName = "org.apache.uima.cas.jcas.DoubleArray";
+  public final static String _TypeName = CAS.TYPE_NAME_DOUBLE_ARRAY;
   
   /**
    * Each cover class when loaded sets an index. Used in the JCas typeArray to go from the cover
@@ -138,7 +139,7 @@ public final class DoubleArray extends TOP implements CommonPrimitiveArray, Doub
    */
   @Override
   public double[] toArray() {
-    return theArray.clone();
+    return Arrays.copyOf(theArray, theArray.length);
   }
 
   /** return the size of the array */
@@ -234,7 +235,7 @@ public final class DoubleArray extends TOP implements CommonPrimitiveArray, Doub
    * @param a the source for the array's initial values
    * @return a newly created and populated array
    */
-  public static DoubleArray createFromArray(JCas jcas, double[] a) {
+  public static DoubleArray create(JCas jcas, double[] a) {
     DoubleArray doubleArray = new DoubleArray(jcas, a.length);
     doubleArray.copyFromArray(a, 0, 0, a.length);
     return doubleArray;

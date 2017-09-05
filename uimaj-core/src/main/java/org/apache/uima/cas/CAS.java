@@ -24,11 +24,26 @@ import java.util.Iterator;
 import java.util.ListIterator;
 
 import org.apache.uima.cas.admin.CASAdminException;
+import org.apache.uima.cas.impl.CASImpl;
 import org.apache.uima.cas.impl.LowLevelCAS;
 import org.apache.uima.cas.impl.SelectFSs_impl;
 import org.apache.uima.cas.text.AnnotationFS;
 import org.apache.uima.cas.text.AnnotationIndex;
 import org.apache.uima.jcas.JCas;
+import org.apache.uima.jcas.cas.BooleanArray;
+import org.apache.uima.jcas.cas.ByteArray;
+import org.apache.uima.jcas.cas.DoubleArray;
+import org.apache.uima.jcas.cas.EmptyFSList;
+import org.apache.uima.jcas.cas.EmptyFloatList;
+import org.apache.uima.jcas.cas.EmptyIntegerList;
+import org.apache.uima.jcas.cas.EmptyStringList;
+import org.apache.uima.jcas.cas.FSArray;
+import org.apache.uima.jcas.cas.FloatArray;
+import org.apache.uima.jcas.cas.IntegerArray;
+import org.apache.uima.jcas.cas.LongArray;
+import org.apache.uima.jcas.cas.ShortArray;
+import org.apache.uima.jcas.cas.StringArray;
+import org.apache.uima.jcas.impl.JCasImpl;
 
 /**
  * Object-oriented CAS (Common Analysis System) API.
@@ -513,6 +528,12 @@ public interface CAS extends AbstractCas {
    */
   <T extends FeatureStructure> T createFS(Type type) throws CASRuntimeException;
 
+  /* 
+   * ===============  These next methods might be deprecated in favor of
+   * ===============  new FSArray(jcas, length) etc.
+   * ===============  except that these run with the CAS, not JCas 
+   */
+  
   /**
    * Create a new feature structure array.
    * 
@@ -602,6 +623,14 @@ public interface CAS extends AbstractCas {
    */
   JCas getJCas() throws CASException;
 
+  /**
+   * Get the JCasImpl for this CAS
+   * @return the JCasImpl for this CAS
+   */
+  default JCasImpl getJCasImpl() {
+    return ((CASImpl) this).getJCasImpl();
+  }
+  
   /**
    * Get the Cas view that the current component should use.  This
    * should only be used by single-view components.
@@ -759,6 +788,20 @@ public interface CAS extends AbstractCas {
   <T extends AnnotationFS> AnnotationIndex<T> getAnnotationIndex(Type type) throws CASRuntimeException;
   
   /**
+   * Get the standard annotation index restricted to a specific annotation type.
+   * 
+   * @param clazz
+   *          The annotation type the index is restricted to, specified as a JCas class
+   * @param <T> the topmost Java class corresponding to the type
+   * @return The standard annotation index, restricted to <code>type</code>.
+   * @exception CASRuntimeException When <code>type</code> is not an annotation type.
+   */
+  default <T extends AnnotationFS> AnnotationIndex<T> getAnnotationIndex(Class<T> clazz) 
+      throws CASRuntimeException {
+    return getAnnotationIndex(this.getJCasImpl().getCasType(clazz));
+  }
+  
+  /**
    * Create a new annotation. Note that you still need to insert the annotation into the index
    * repository yourself.
    * 
@@ -774,7 +817,7 @@ public interface CAS extends AbstractCas {
   <T extends AnnotationFS> AnnotationFS createAnnotation(Type type, int begin, int end);
 
   /**
-   * Get the document annotation. The document has a string-valued feature called "language" where
+   * Get the Document Annotation. The Document Annotation has a string-valued feature called "language" where
    * the document language is specified.
    * 
    * @param <T> the Java class for the document annotation.  Could be the JCas cover class or FeatureStructure
@@ -1141,4 +1184,96 @@ public interface CAS extends AbstractCas {
   default <T extends FeatureStructure> SelectFSs<T> select(String fullyQualifiedTypeName) {
     return new SelectFSs_impl<>(this).type(fullyQualifiedTypeName);
   }
+  
+  /** 
+   * @return a lazily created shared (for this CAS) empty list
+   */
+  default EmptyFloatList getEmptyFloatList() {
+    return ((CASImpl)getLowLevelCAS()).getEmptyFloatList();
+  };
+  
+  /** 
+   * @return a lazily created shared (for this CAS) empty list
+   */
+  default EmptyFSList getEmptyFSList() {
+    return ((CASImpl)getLowLevelCAS()).getEmptyFSList();
+  };
+  
+  /** 
+   * @return a lazily created shared (for this CAS) empty list
+   */
+  default EmptyIntegerList getEmptyIntegerList() {
+    return ((CASImpl)getLowLevelCAS()).getEmptyIntegerList();
+  };
+
+  /** 
+   * @return a lazily created shared (for this CAS) empty list
+   */
+  default EmptyStringList getEmptyStringList() {
+    return ((CASImpl)getLowLevelCAS()).getEmptyStringList();
+  };
+  
+  /** 
+   * @return a lazily created shared (for this CAS) 0-length array
+   */
+  default FloatArray getEmptyFloatArray() {
+    return ((CASImpl)getLowLevelCAS()).getEmptyFloatArray();
+  };
+
+  /** 
+   * @return a lazily created shared (for this CAS) 0-length array
+   */
+  default FSArray getEmptyFSArray() {
+    return ((CASImpl)getLowLevelCAS()).getEmptyFSArray();
+  };
+
+  /** 
+   * @return a lazily created shared (for this CAS) 0-length array
+   */
+  default IntegerArray getEmptyIntegerArray() {
+    return ((CASImpl)getLowLevelCAS()).getEmptyIntegerArray();
+  };
+
+  /** 
+   * @return a lazily created shared (for this CAS) 0-length array
+   */
+  default StringArray getEmptyStringArray() {
+    return ((CASImpl)getLowLevelCAS()).getEmptyStringArray();
+  };
+
+  /** 
+   * @return a lazily created shared (for this CAS) 0-length array
+   */
+  default DoubleArray getEmptyDoubleArray() {
+    return ((CASImpl)getLowLevelCAS()).getEmptyDoubleArray();
+  };
+
+  /** 
+   * @return a lazily created shared (for this CAS) 0-length array
+   */
+  default LongArray getEmptyLongArray() {
+    return ((CASImpl)getLowLevelCAS()).getEmptyLongArray();
+  };
+
+  /** 
+   * @return a lazily created shared (for this CAS) 0-length array
+   */
+  default ShortArray getEmptyShortArray() {
+    return ((CASImpl)getLowLevelCAS()).getEmptyShortArray();
+  };
+
+  /** 
+   * @return a lazily created shared (for this CAS) 0-length array
+   */
+  default ByteArray getEmptyByteArray() {
+    return ((CASImpl)getLowLevelCAS()).getEmptyByteArray();
+  };
+
+  /** 
+   * @return a lazily created shared (for this CAS) 0-length array
+   */
+  default BooleanArray getEmptyBooleanArray() {
+    return ((CASImpl)getLowLevelCAS()).getEmptyBooleanArray();
+  };
+  
 }

@@ -26,6 +26,7 @@ import java.util.Spliterator;
 import java.util.function.LongConsumer;
 import java.util.stream.LongStream;
 
+import org.apache.uima.cas.CAS;
 import org.apache.uima.cas.CommonArrayFS;
 import org.apache.uima.cas.impl.CASImpl;
 import org.apache.uima.cas.impl.LongArrayFSImpl;
@@ -37,7 +38,7 @@ import org.apache.uima.jcas.JCasRegistry;
 public final class LongArray extends TOP implements CommonPrimitiveArray, LongArrayFSImpl, Iterable<Long> {
 
   /* public static string for use where constants are needed, e.g. in some Java Annotations */
-  public final static String _TypeName = "org.apache.uima.cas.jcas.LongArray";
+  public final static String _TypeName = CAS.TYPE_NAME_LONG_ARRAY;
 
   
   /**
@@ -139,7 +140,7 @@ public final class LongArray extends TOP implements CommonPrimitiveArray, LongAr
    */
   @Override
   public long[] toArray() {
-    return theArray.clone();
+    return Arrays.copyOf(theArray, theArray.length);
   }
 
   /** return the size of the array */
@@ -237,12 +238,16 @@ public final class LongArray extends TOP implements CommonPrimitiveArray, LongAr
    * @param a the source for the array's initial values
    * @return a newly created and populated array
    */
-  public static LongArray createFromArray(JCas jcas, long[] a) {
+  public static LongArray create(JCas jcas, long[] a) {
     LongArray longArray = new LongArray(jcas, a.length);
     longArray.copyFromArray(a, 0, 0, a.length);
     return longArray;
   }
   
+  /**
+   * Non Boxing
+   * @param action to be performed on each element
+   */
   public void forEach(LongConsumer action) {
     for (long l : theArray) {
       action.accept(l);

@@ -47,8 +47,14 @@ import org.apache.uima.cas.impl.LowLevelCAS;
 import org.apache.uima.cas.impl.LowLevelIndexRepository;
 import org.apache.uima.cas.impl.SelectFSs_impl;
 import org.apache.uima.cas.text.AnnotationIndex;
+import org.apache.uima.jcas.cas.BooleanArray;
+import org.apache.uima.jcas.cas.ByteArray;
+import org.apache.uima.jcas.cas.DoubleArray;
 import org.apache.uima.jcas.cas.FSArray;
+import org.apache.uima.jcas.cas.FloatArray;
 import org.apache.uima.jcas.cas.IntegerArray;
+import org.apache.uima.jcas.cas.LongArray;
+import org.apache.uima.jcas.cas.ShortArray;
 import org.apache.uima.jcas.cas.Sofa;
 import org.apache.uima.jcas.cas.StringArray;
 import org.apache.uima.jcas.cas.TOP;
@@ -102,11 +108,11 @@ public interface JCas extends AbstractCas {
   /**
    * Backwards Compatibility only - throws unsupported operation exception
    * 
-   * get the JCas _Type instance for a particular CAS type constant
+   * In UIMA V2, this previously got the JCas _Type instance for a particular CAS type constant
+   * In UIMA V3, there is no _Type instance, so this throws an exception
    * 
-   * @param i
-   *          the CAS type constant, written as Foo.type
-   * @return the instance of the JCas xxx_Type object for the specified type
+   * @param i the CAS type constant, written as Foo.type
+   * @return none - throws an exception
    */
   public abstract TOP_Type getType(int i);
   
@@ -159,7 +165,7 @@ public interface JCas extends AbstractCas {
    */
   @Deprecated
   default void putJfsFromCaddr(int casAddr, FeatureStructure fs) {
-    throw new UnsupportedOperationException("not supported in UIMA v3");
+    throw new UnsupportedOperationException("not supported in UIMA v3; maybe caused by running with UIMA v2 JCas classes in UIMA v3");
   } 
 
   /*
@@ -167,7 +173,7 @@ public interface JCas extends AbstractCas {
    * @deprecated only for V2 compiling
    */
   default <T extends TOP> T getJfsFromCaddr(int casAddr) {
-    throw new UnsupportedOperationException("not supported in UIMA v3");
+    throw new UnsupportedOperationException("not supported in UIMA v3; maybe caused by running with UIMA v2 JCas classes in UIMA v3");
   } 
 
   /*
@@ -262,35 +268,151 @@ public interface JCas extends AbstractCas {
    * updatable (it has no subfields). This is initialized lazily on first reference, and reset when
    * the CAS is reset.
    * @return 0-length instance of a StringArray
+   * @deprecated renamed getEmptyXXXArray
    */
-
-  StringArray getStringArray0L();
-
+  @Deprecated
+  default StringArray getStringArray0L() {
+    return this.getCas().getEmptyStringArray();
+  }
   /**
    * A constant for each cas which holds a 0-length instance. Since this can be a common value, we
    * avoid creating multiple copies of it. All uses can use the same valuee because it is not
+   * updatable (it has no subfields). This is initialized lazily on first reference, and reset when
+   * the CAS is reset.
+   * @return 0-length instance of a StringArray
+   */
+  default StringArray getEmptyStringArray() {
+    return this.getCas().getEmptyStringArray();
+  }
+
+  /**
+   * A constant for each cas which holds a 0-length instance. Since this can be a common value, we
+   * avoid creating multiple copies of it. All uses can use the same value because it is not
+   * updatable (it has no subfields). This is initialized lazily on first reference, and reset when
+   * the CAS is reset.
+   * @return 0-length instance of an IntegerArray
+   * @deprecated renamed getEmptyXXXArray
+   */
+  @Deprecated
+  default IntegerArray getIntegerArray0L() {
+    return this.getCas().getEmptyIntegerArray();
+  }
+  /**
+   * A constant for each cas which holds a 0-length instance. Since this can be a common value, we
+   * avoid creating multiple copies of it. All uses can use the same value because it is not
    * updatable (it has no subfields). This is initialized lazily on first reference, and reset when
    * the CAS is reset.
    * @return 0-length instance of an IntegerArray
    */
-  IntegerArray getIntegerArray0L();
+  default IntegerArray getEmptyIntegerArray() {
+    return this.getCas().getEmptyIntegerArray();
+  }
 
   /**
    * A constant for each cas which holds a 0-length instance. Since this can be a common value, we
-   * avoid creating multiple copies of it. All uses can use the same valuee because it is not
+   * avoid creating multiple copies of it. All uses can use the same value because it is not
    * updatable (it has no subfields). This is initialized lazily on first reference, and reset when
    * the CAS is reset.
    * @return 0-length instance of a FloatArray
-  FloatArray getFloatArray0L();
+   * @deprecated renamed getEmptyXXXArray
+   */
+  @Deprecated
+  default FloatArray getFloatArray0L() {
+    return this.getCas().getEmptyFloatArray();
+  }
+  /**
+   * A constant for each cas which holds a 0-length instance. Since this can be a common value, we
+   * avoid creating multiple copies of it. All uses can use the same value because it is not
+   * updatable (it has no subfields). This is initialized lazily on first reference, and reset when
+   * the CAS is reset.
+   * @return 0-length instance of a FloatArray
+   */
+  default FloatArray getEmptyFloatArray() {
+    return this.getCas().getEmptyFloatArray();
+  }
 
   /**
    * A constant for each cas which holds a 0-length instance. Since this can be a common value, we
-   * avoid creating multiple copies of it. All uses can use the same valuee because it is not
+   * avoid creating multiple copies of it. All uses can use the same value because it is not
    * updatable (it has no subfields). This is initialized lazily on first reference, and reset when
    * the CAS is reset.
+   * 
+   * See also the CAS API 
+   * @return 0-length instance of a FSArray
+   * @deprecated renamed getEmptyXXXArray
+   */
+  @Deprecated
+  default FSArray getFSArray0L() {
+    return this.getCas().getEmptyFSArray();
+  }
+  /**
+   * A constant for each cas which holds a 0-length instance. Since this can be a common value, we
+   * avoid creating multiple copies of it. All uses can use the same value because it is not
+   * updatable (it has no subfields). This is initialized lazily on first reference, and reset when
+   * the CAS is reset.
+   * 
+   * See also the CAS API 
    * @return 0-length instance of a FSArray
    */
-  FSArray getFSArray0L();
+  default FSArray getEmptyFSArray() {
+    return this.getCas().getEmptyFSArray();
+  }
+
+  /**
+   * A constant for each cas which holds a 0-length instance. Since this can be a common value, we
+   * avoid creating multiple copies of it. All uses can use the same value because it is not
+   * updatable (it has no subfields). This is initialized lazily on first reference, and reset when
+   * the CAS is reset.
+   * @return 0-length instance of a ByteArray
+   */
+  default ByteArray getEmptyByteArray() {
+    return this.getCas().getEmptyByteArray();
+  }
+
+  /**
+   * A constant for each cas which holds a 0-length instance. Since this can be a common value, we
+   * avoid creating multiple copies of it. All uses can use the same value because it is not
+   * updatable (it has no subfields). This is initialized lazily on first reference, and reset when
+   * the CAS is reset.
+   * @return 0-length instance of a ShortArray
+   */
+  default ShortArray getEmptyuShortArray() {
+    return this.getCas().getEmptyShortArray();
+  }
+
+  /**
+   * A constant for each cas which holds a 0-length instance. Since this can be a common value, we
+   * avoid creating multiple copies of it. All uses can use the same value because it is not
+   * updatable (it has no subfields). This is initialized lazily on first reference, and reset when
+   * the CAS is reset.
+   * @return 0-length instance of a LongArray
+   */
+  default LongArray getEmptyLongArray() {
+    return this.getCas().getEmptyLongArray();
+  }
+  
+  /**
+   * A constant for each cas which holds a 0-length instance. Since this can be a common value, we
+   * avoid creating multiple copies of it. All uses can use the same value because it is not
+   * updatable (it has no subfields). This is initialized lazily on first reference, and reset when
+   * the CAS is reset.
+   * @return 0-length instance of a DoubleArray
+   */
+  default DoubleArray getEmptyDoubleArray() {
+    return this.getCas().getEmptyDoubleArray();
+  }
+  
+  /**
+   * A constant for each cas which holds a 0-length instance. Since this can be a common value, we
+   * avoid creating multiple copies of it. All uses can use the same value because it is not
+   * updatable (it has no subfields). This is initialized lazily on first reference, and reset when
+   * the CAS is reset.
+   * @return 0-length instance of a DoubleArray
+   */
+  default BooleanArray getEmptyBooleanArray() {
+    return this.getCas().getEmptyBooleanArray();
+  }
+
 
   /**
    * initialize the JCas for new Cas content. Not used, does nothing.
@@ -595,11 +717,39 @@ public interface JCas extends AbstractCas {
   void removeAllIncludingSubtypes(int i);
   
   /**
+   * Remove all instances of type, including all subtypes from all indexes in the repository view.
+   * @param clazz the JCas class of the type to remove.  To remove all use TOP.class
+   * @param <T> the type to remove
+   * @exception NullPointerException if the <code>clazz</code> parameter is <code>null</code>.
+  */
+  default <T extends TOP> void removeAllIncludingSubtypes(Class<T> clazz) {
+    getFSIndexRepository().removeAllIncludingSubtypes(getCasType(clazz));
+  }
+  
+  /**
    * Remove all feature structures of a given type (excluding subtypes) from all indexes in the repository associated with this CAS View.
    * @param i the CAS type constant, written as Foo.type (for a given JCas Type) or anInstanceOfFoo.getTypeIndexID(), for an instance
    */
   void removeAllExcludingSubtypes(int i);
 
+  /**
+   * Remove all instances of just this type, excluding subtypes, from all indexes in the repository view.
+   * @param clazz the JCas Class of the type to remove
+   * @param <T> the type to remove
+   * @exception NullPointerException if the <code>type</code> parameter is <code>null</code>.
+  */
+  default <T extends TOP> void removeAllExcludingSubtypes(Class<T> clazz) {
+    getFSIndexRepository().removeAllExcludingSubtypes(getCasType(clazz));
+  }
+
+  /**
+   * Return the UIMA Type object corresponding to this JCas's JCas cover class
+   *   (Note: different JCas's, with different type systems, may share the same cover class impl)
+   * @param clazz a JCas cover class
+   * @return the corresponding UIMA Type object
+   */
+  public Type getCasType(Class<? extends FeatureStructure> clazz);
+  
   /**
    * Get the standard annotation index.
    * 

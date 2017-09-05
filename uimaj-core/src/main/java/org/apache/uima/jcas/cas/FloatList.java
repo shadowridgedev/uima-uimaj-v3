@@ -86,7 +86,7 @@ public abstract class FloatList extends TOP implements CommonList, Iterable<Floa
    * @param a the array of Floats to populate the list with
    * @return an FloatList, with the elements from the array
    */
-  public static FloatList createFromArray(JCas jcas, Float[] a) {
+  public static FloatList create(JCas jcas, Float[] a) {
     FloatList floatList = jcas.getCasImpl().getEmptyFloatList();   
     for (int i = a.length - 1; i >= 0; i--) {
       floatList = floatList.push(a[i]);

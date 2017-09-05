@@ -19,6 +19,9 @@
 
 package org.apache.uima.jcas.cas;
 
+import java.util.Arrays;
+
+import org.apache.uima.cas.CAS;
 import org.apache.uima.cas.CommonArrayFS;
 import org.apache.uima.cas.impl.CASImpl;
 import org.apache.uima.cas.impl.FloatArrayFSImpl;
@@ -30,7 +33,7 @@ import org.apache.uima.jcas.JCasRegistry;
 public final class FloatArray extends TOP implements CommonPrimitiveArray, FloatArrayFSImpl {
 
   /* public static string for use where constants are needed, e.g. in some Java Annotations */
-  public final static String _TypeName = "org.apache.uima.cas.jcas.FloatArray";
+  public final static String _TypeName = CAS.TYPE_NAME_FLOAT_ARRAY;
 
   /**
    * Each cover class when loaded sets an index. Used in the JCas typeArray to go from the cover
@@ -141,7 +144,7 @@ public final class FloatArray extends TOP implements CommonPrimitiveArray, Float
    * @see org.apache.uima.cas.ArrayFS#toArray()
    */
   public float[] toArray() {
-    return theArray.clone();
+    return Arrays.copyOf(theArray, theArray.length);
   }
 
   /**
@@ -203,7 +206,7 @@ public final class FloatArray extends TOP implements CommonPrimitiveArray, Float
    * @param a the source for the array's initial values
    * @return a newly created and populated array
    */
-  public static FloatArray createFromArray(JCas jcas, float[] a) {
+  public static FloatArray create(JCas jcas, float[] a) {
     FloatArray floatArray = new FloatArray(jcas, a.length);
     floatArray.copyFromArray(a, 0, 0, a.length);
     return floatArray;

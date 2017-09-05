@@ -79,7 +79,7 @@ public abstract class StringList extends TOP implements CommonList, Iterable<Str
    * @param a the array of Strings to populate the list with
    * @return an StringList, with the elements from the array
    */
-  public static StringList createFromArray(JCas jcas, String[] a) {
+  public static StringList create(JCas jcas, String[] a) {
     StringList stringList = jcas.getCasImpl().getEmptyStringList();   
     for (int i = a.length - 1; i >= 0; i--) {
       stringList = stringList.push(a[i]);

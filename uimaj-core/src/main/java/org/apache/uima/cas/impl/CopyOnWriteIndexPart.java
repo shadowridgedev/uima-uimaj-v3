@@ -26,4 +26,9 @@ public interface CopyOnWriteIndexPart {
   
   void makeReadOnlyCopy();
   
+  /**
+   * @return true if this cow version is the same as the original.
+   *              true means the index has not been updated
+   */
+  boolean isOriginal();
 }

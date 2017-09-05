@@ -24,6 +24,8 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.FilenameFilter;
 import java.io.IOException;
+import java.io.PrintStream;
+import java.io.UnsupportedEncodingException;
 import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.MethodHandles.Lookup;
@@ -33,26 +35,37 @@ import java.lang.reflect.Method;
 import java.net.MalformedURLException;
 import java.net.URISyntaxException;
 import java.net.URL;
+import java.nio.ByteBuffer;
+import java.util.AbstractSequentialList;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Iterator;
 import java.util.List;
+import java.util.ListIterator;
+import java.util.Set;
 import java.util.WeakHashMap;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import java.util.function.IntConsumer;
+import java.util.function.Supplier;
 import java.util.regex.Pattern;
 
 import org.apache.uima.UIMAFramework;
 import org.apache.uima.UIMARuntimeException;
 import org.apache.uima.cas.CAS;
 import org.apache.uima.internal.util.function.Runnable_withException;
+import org.apache.uima.util.Level;
+import org.apache.uima.util.Logger;
 
 public class Misc {
   
   public static final boolean isJava9ea = System.getProperty("java.version").startsWith("9-ea");
 
-  public static final String blanks = "                                                     ";
+  public static final String blanks = new String(new char[1000]).replace('\0', ' ');
   public static final String dots = "...";
+  public static final String ls = System.lineSeparator(); // n or r n
+  public static final int[] INT0 = new int[] {0};
   
   private static final Pattern whitespace = Pattern.compile("\\s");
 
@@ -62,6 +75,30 @@ public class Misc {
   
   public static String null2str(String s) {
     return (s == null) ? "" : s;
+  }
+  
+  public static String dumpByteArray(byte[] b, int limit) {
+    if (b == null) {
+      return "null";
+    }
+    if (b.length == 0) {
+      return "0-length";
+    }
+    StringBuilder sb = new StringBuilder(b.length * 3);
+    for (int i = 0; i < b.length; i++) {
+      if ((i % 100) == 0) {
+        sb.append('\n');
+      }
+      sb.append(String.format("%02X", b[i]));  // 0 means 0 padding, 2 means width
+      if ((i % 2) == 1) {
+        sb.append(' ');
+      }
+      if (i > limit) {
+        sb.append("\n Hit the limit: ").append(limit);
+        break;
+      }
+    }
+    return sb.toString();
   }
   
   /**
@@ -102,10 +139,21 @@ public class Misc {
     return className.substring(1 + className.lastIndexOf('.')) + "." + methodName + "[" + lineNumber + "]";
   }
 
+  /**
+   * @param s the string to possibly elide
+   * @param n the length, after which, elision happens
+   * @return the elided string, padded on the left to length n
+   */
   public static String elide(String s, int n) {
     return elide(s, n, true);
   }
   
+  /**
+   * @param s the string to possibly elide
+   * @param n the length, after which, elision happens
+   * @param pad true to include left padding to length n
+   * @return the elided string, padded on the left to length n
+   */
   public static String elide(String s, int n, boolean pad) {
     if (s == null) {
       s = "null";
@@ -120,6 +168,32 @@ public class Misc {
     return s.substring(0, ss) + dots.substring(0, dl) + s.substring(sl - ss2);
   }
   
+  /**
+   * @param sb the stringBuilder to indent
+   * @param indent the indent amount (passed as array of 1 item, to allow it to be final for lambdas
+   * @return the stringBuilder, with nl if needed, and indention
+   */
+  public static StringBuilder indent(StringBuilder sb, int[] indent) {
+    return indent(sb, indent[0]);
+  }
+  
+  /**
+   * @param sb the stringBuilder to indent
+   * @param indent the indent amount 
+   * @return the stringBuilder, with nl if needed, and indention
+   */
+  public static StringBuilder indent(StringBuilder sb, int indent) {
+    if (!endsWithNl(sb) && indent > 0) {
+      sb.append(ls);
+    }
+    return sb.append(blanks, 0, Math.min(blanks.length(), indent));    
+  }
+  
+  private static boolean endsWithNl(StringBuilder sb) {
+    int l = sb.length();
+    return (l >= 1) && sb.charAt(l-1) == '\n';
+  }
+    
   public final static MethodHandles.Lookup UIMAlookup = MethodHandles.lookup();
  
   
@@ -164,7 +238,7 @@ public class Misc {
     File pf = new File(p);
     if (pf.isDirectory()) {
       File[] jars = pf.listFiles(jarFilter);
-      if (jars.length == 0) {
+      if (jars == null || jars.length == 0) {
         // this is the case where the user wants to include
         // a directory containing non-jar'd .class files
         addPathToURLs(urls, pf); 
@@ -206,7 +280,7 @@ public class Misc {
   public static String expandClasspath(String classpath) {
     StringBuilder sb = new StringBuilder();
     for (URL url : classpath2urls(classpath)) {
-      sb.append(url.toString());
+      sb.append(url.getPath());  // returns as a string just the path part of the url
       sb.append(File.pathSeparatorChar);
     }
     return sb.substring(0, sb.length() - 1);  // drop trailing ":"
@@ -230,38 +304,123 @@ public class Misc {
    * @param <T> the kind of elements in the collection
    * @return the StringBuilder for chaining
    */
-  public static <T> StringBuilder addElementsToStringBuilder(StringBuilder sb, Collection<T> c){
+  public static <T> StringBuilder addElementsToStringBuilder(StringBuilder sb, Collection<T> c) {
+    return addElementsToStringBuilder(sb, c, 1000);
+  }
+  
+  public static <T> StringBuilder addElementsToStringBuilder(StringBuilder sb, Collection<T> c, int limit) {
+    return addElementsToStringBuilder(sb, c, limit, StringBuilder::append);
+  }
+
+  public static <T> StringBuilder addElementsToStringBuilder(StringBuilder sb, Collection<T> c, BiConsumer<StringBuilder, T> appender) {
+    return addElementsToStringBuilder(sb, c, 1000, appender);
+  }
+  
+  public static <T> StringBuilder addElementsToStringBuilder(List<T> c, int limit) {
+    return addElementsToStringBuilder(c, limit, StringBuilder::append);
+  }
+  
+  public static <T> StringBuilder addElementsToStringBuilder(List<T> c, int limit, BiConsumer<StringBuilder, T> appender) {
+    return addElementsToStringBuilder(INT0, c, limit, appender);
+  }
+
+  public static <T> StringBuilder addElementsToStringBuilder(int[] indent, List<T> c, int limit, BiConsumer<StringBuilder, T> appender) {
+    if (c == null) {
+      return indent(new StringBuilder(), indent).append("null");
+    }
+    
+    int sz = Math.min(limit, c.size());
+    StringBuilder sb = indent(new StringBuilder(sz * 5 + 2), indent);
+    return addElementsToStringBuilder(indent, sb, c, limit, appender);
+  }
+    
+  /**
+   * Does two styles of list formatting:
+   *   Style 1:  [ item1, item 2, item3]
+   *   Style 2:  [ 
+   *               item1,
+   *               item2,
+   *               item3
+   *             ]
+   * Starts as style 1, switches to style 2 when length &gt; 60             
+   * @param sb where the string is assembled
+   * @param c the collection to process
+   * @param limit the maximum number of items, if negative, no limit
+   * @param appender the appender
+   * @param <T> the type of the collection
+   * @return argument sb, appeneded
+   */
+  public static <T> StringBuilder addElementsToStringBuilder(StringBuilder sb, Collection<T> c, int limit, BiConsumer<StringBuilder, T> appender) {
+    return addElementsToStringBuilder(INT0, sb, c, limit, appender);
+  }
+  
+  public static <T> StringBuilder addElementsToStringBuilder(int[] indent, StringBuilder sb, Collection<T> c, int limit, BiConsumer<StringBuilder, T> appender) {
+  
+    int origLength = sb.length();
+    
+    if (c.size() == 0) {       // empty case
+      return sb.append("[]");
+    }
+    
     sb.append('[');
-    String[] prefix = new String[] {""};
-    c.stream().forEachOrdered(item -> {
-       sb.append(prefix[0]);
-       sb.append(item.toString());
-       prefix[0] = ", ";
-    });
+    int i = 0;
+    boolean overLimit = false;
+    for (T item : c) {
+      if ((i++) >= limit && limit >= 0) {
+        overLimit = true;
+        break;
+      } else {
+//        sb.append(item.toString());
+        appender.accept(sb, item);
+        sb.append(", ");
+        if (sb.length() - origLength > 60) {
+          sb.setLength(origLength);  // is too long to present on one line, change to multi-line format
+          return style2(indent, sb, c, limit, appender);
+        }
+      }
+    }
+    
+    if (overLimit) {
+      sb.append("...");
+    } else {
+      sb.setLength(sb.length() - 2);  // drop the final ", "
+    }
+    
     sb.append(']');
     return sb;
   }
   
-  /**
-   * For standardized prettyprinting, to string
-   * Adds a collection of things (running an appender to append the result to the same sb) separated by , and surrounded by [  ], to a StringBuilder
-   * @param sb where the formatted collection results are appended to 
-   * @param c the collection
-   * @param appender the function for getting the value to append
-   * @param <T> the kind of elements in the collection
-   * @return the StringBuilder for chaining
-   */
-  public static<T> StringBuilder addElementsToStringBuilder(StringBuilder sb, Collection<T> c, Consumer<T> appender){
-    sb.append('[');
-    String[] prefix = new String[] {""};
-    c.stream().forEachOrdered(item -> {
-       sb.append(prefix[0]);
-       appender.accept(item);
-       prefix[0] = ", ";
-    });
-    sb.append(']');
+  private static <T> StringBuilder style2(int[] indent, StringBuilder sb, Collection<T> c, int limit, BiConsumer<StringBuilder, T> appender) {
+    sb.append("[");
+    indent[0] += 2;
+    indent(sb, indent);
+    try {
+      int i = 0;
+      int cl = -1; // for dropping trailing end punctuation
+      boolean overLimit = false;
+      for (T item : c) {
+        if ((i++) >= limit && limit >= 0) {
+          overLimit = true;
+          break;
+        } else {
+          appender.accept(sb, item);
+          cl = sb.length();
+          sb.append(",");
+          indent(sb, indent);
+        }
+      }
+      
+      if (overLimit) {
+        sb.append("...");
+      } else {
+        sb.setLength(cl);  // drop the final ",etc "
+      }      
+    } finally {
+      indent[0] -= 2;
+      indent(sb, indent).append(']');
+    }
     return sb;
-  }  
+  }
   
   /**
    * Writes a byte array output stream to a file
@@ -417,8 +576,9 @@ public class Misc {
       throw new UIMARuntimeException(e, UIMARuntimeException.INTERNAL_ERROR);
   }
   
-  public static void internalError() {
+  public static RuntimeException internalError() {
     assertUie(false);
+    return null;
   }
   
   public static void internalError(Throwable e) {
@@ -452,6 +612,23 @@ public class Misc {
     h1 *= 0xc2b2ae35;
     h1 ^= h1 >>> 16;
     return h1;
+  }
+  
+  /**
+   * a hash for strings as a long - less likely to be a collision
+   * @param s - the string
+   * @return a long hash
+   */
+  public static long hashStringLong(String s) {
+    if (s == null) return 0;
+    int l = s.length();
+    if (l == 0) return 0;
+    long c = 1; 
+    
+    for (int i = 0; i < l; i++) {
+      c = 31 * c + s.charAt(i);
+    }
+    return c;
   }
 
   public static <T> T getWithExpand(List<T> a, int i) {
@@ -526,11 +703,66 @@ public class Misc {
   /**
    * format a list of items for pretty printing as [item1, item2, ... ]
    * @param items to print
+   * @param <T> the type of elements in the list
    * @return  [item1, item2, ... ]
    */
-  public static String ppList(List<?> items) {
-    StringBuilder sb = new StringBuilder(items.size() * 5 + 2);
-    return addElementsToStringBuilder(sb, items).toString();
+  public static <T> String ppList(List<T> items) {
+    return ppList(items, 1000);
+  }
+  
+  /**
+   * @param items to print
+   * @param max - maximum number of items to print
+   * @param <T> the type of elements in the list
+   * @return  [item1, item2, ... ]
+   */
+  public static <T> String ppList(List<T> items, int max) {
+    return addElementsToStringBuilder(items, max).toString();   
+  }
+  
+  /**
+   * @param items to print
+   * @param max - maximum number of items to print
+   * @param appender - appender function
+   * @param <T> the type of elements in the list
+   * @return  [item1, item2, ... ]
+   */
+  public static <T> String ppList(List<T> items, int max, BiConsumer<StringBuilder, T> appender) {
+    return addElementsToStringBuilder(items, max, appender).toString();   
+  }
+  
+  /**
+   * format a list of items for pretty printing as [item1, item2, ... ]
+   * @param indent the amount to use as indentation
+   * @param items to print
+   * @param <T> the type of elements in the list
+   * @return  [item1, item2, ... ]
+   */
+  public static <T> String ppList(int[] indent, List<T> items) {
+    return ppList(indent, items, 1000);
+  }
+  
+  /**
+   * @param indent the amount to use as indentation
+   * @param items to print
+   * @param max - maximum number of items to print
+   * @param <T> the type of elements in the list
+   * @return  [item1, item2, ... ]
+   */
+  public static <T> String ppList(int[] indent, List<T> items, int max) {
+    return addElementsToStringBuilder(items, max).toString();   
+  }
+
+  /**
+   * @param indent the amount to use as indentation
+   * @param items to print
+   * @param max - maximum number of items to print
+   * @param appender - appender function
+   * @param <T> the type of elements in the list
+   * @return  [item1, item2, ... ]
+   */
+  public static <T> String ppList(int[] indent, List<T> items, int max, BiConsumer<StringBuilder, T> appender) {
+    return addElementsToStringBuilder(items, max, appender).toString();   
   }
 
   /**
@@ -627,6 +859,169 @@ public class Misc {
     return isJava9ea;
   }
   
+  /** 
+   * extract the slashified version of the fully qualified class name from
+   * the bytecode for a class
+   * @param bytes the bytecode to extract from
+   * @return the slashified class name eg. x/y/z/Myclass
+   */
+  public static String classNameFromByteCode(byte[] bytes) {
+    ByteBuffer bb = ByteBuffer.wrap(bytes);
+    int temp = (bb.getShort() & 0xffff);  // constant at the beginning
+    assert 0xCAFE == temp;
+    temp = (bb.getShort() & 0xffff);
+    assert 0xBABE == temp;
+    bb.getInt();  // skip major/minor version
+    
+    int constantPoolCount = (bb.getShort() & 0xffff) - 1;  // in bytecode "words"
+    int[] classes = new int[constantPoolCount];
+    String[] strings = new String[constantPoolCount];
+    for(int i = 0; i < constantPoolCount; i++) {
+      int tagByte = bb.get();
+      switch (tagByte) {
+      case 7: classes[i] = bb.getShort() & 0xffff; break;
+      case 1: strings[i] = readModifiedUTF8(bb); break;
+      case 5: 
+      case 6: bb.getLong(); i++; /* skip next */ break;
+      case 8: bb.getShort(); break;
+      default: bb.getInt(); 
+      }
+    }
+    bb.getShort(); // go past access flags
+    int indexIntoConstantPoolOfClassInfo = (bb.getShort() & 0xffff) - 1;
+    return strings[classes[indexIntoConstantPoolOfClassInfo] - 1];
+  }
+  
+  /** 
+   * read ByteBuffer modified UTF into String
+   * see http://docs.oracle.com/javase/specs/jvms/se8/html/jvms-4.html#jvms-4.4 
+   */
+  private static String readModifiedUTF8(ByteBuffer bb) {
+    int len = bb.getShort() & 0xffff;
+    StringBuilder sb = new StringBuilder();
+    
+    while (len > 0) {
+      int c = bb.get() & 0xff;
+      if ((c & 0x80) == 0 ) {
+        sb.append((char) c);
+        len --;
+      } else if ((c & 0x60) == 0x40) {
+        int r = (c & 0x1f) << 6;
+        c = bb.get() & 0xff;
+        assert 0x80 == (c & 0xc0);
+        r = r | (bb.get() & 0x3f);
+        sb.append((char) r);
+        len -= 2;
+      } else if ((c & 0xf0) == 0xe0)  {
+        int r = c & 0x0f << 6;
+        c = bb.get() & 0xff;
+        assert 0x80 == (c & 0xc0);
+        r = (r | (c & 0x3f)) << 6;
+        c = bb.get() & 0xff;
+        assert 0x80 == (c & 0xc0);
+        r = r | (c & 0x3f);
+        sb.append((char) r);
+        len -= 3;
+      } else {
+        internalError(new UnsupportedEncodingException());
+      }
+    }
+    
+    return sb.toString();
+  }
+  
+  public static <T> List<T> setAsList(Set<T> set) {
+    return new AbstractSequentialList<T>() {
+
+      @Override
+      public ListIterator<T> listIterator(int index) {
+        Iterator<T> it = set.iterator();
+        int[] i = {0};
+        return new ListIterator<T>() {
+
+          @Override
+          public boolean hasNext() {
+            return it.hasNext();
+          }
+
+          @Override
+          public T next() {
+            i[0]++;
+            return it.next();
+          }
+
+          @Override
+          public int nextIndex() {
+            return i[0];
+          }
+
+          @Override
+          public void remove() {
+            it.remove();
+          }
+          
+          @Override public boolean hasPrevious()   {throw new UnsupportedOperationException();}
+          @Override public T       previous()      {throw new UnsupportedOperationException();}
+          @Override public int     previousIndex() {throw new UnsupportedOperationException();}
+          @Override public void    set(T e)        {throw new UnsupportedOperationException();}
+          @Override public void    add(T e)        {throw new UnsupportedOperationException();}          
+        };
+      }
+
+      @Override
+      public int size() {
+        return set.size();
+      }
+      
+    };
+  }
+  
+  static public boolean contains(String[] strings, String item) {
+    for (String string: strings) {
+      if (Misc.equalStrings(string,  item)) {
+        return true;
+      }
+    }
+    return false;
+  }
+  
+  /**
+   * Issues message at warning or fine level (fine if enabled, includes stack trace)
+   * @param errorCount the count of errors used to decrease the frequency
+   * @param message the message
+   * @param logger the logger to use
+   */
+  public static void decreasingWithTrace(AtomicInteger errorCount, String message, Logger logger) {
+    if (logger != null) {
+      final int c = errorCount.incrementAndGet();
+      final int cTruncated = Integer.highestOneBit(c); 
+      // log with decreasing frequency
+      if (cTruncated == c) {
+        if (logger.isLoggable(Level.FINE)) {
+          try { throw new Throwable();}
+          catch (Throwable e) {
+            ByteArrayOutputStream baos = new ByteArrayOutputStream();
+            PrintStream ps = new PrintStream(baos);
+            e.printStackTrace(ps);
+            message = "Message count: " + c + "; " + message + " Message count indicates messages skipped to avoid potential flooding.\n" + baos.toString();
+            logger.log(Level.FINE, message);
+          }
+        } else {
+          message = "Message count: " + c + "; " + message + " Message count indicates messages skipped to avoid potential flooding.";
+          logger.log(Level.WARNING, message);
+        }
+      }
+    }
+  }
+
+  public static void decreasingMessage(AtomicInteger errorCount, Supplier<String> messageSupplier, Consumer<String> publishMessage) {
+    final int c = errorCount.incrementAndGet();
+    final int cTruncated = Integer.highestOneBit(c);  // 1, 2, 4, 8, etc.
+    if (cTruncated == c) { // only happens for 1, 2, 4, etc
+      String message = "Message count: " + c + "; " + messageSupplier.get() + " Message count indicates messages skipped to avoid potential flooding.";
+      publishMessage.accept(message);
+    }
+  }
 //private static final Function<String, Class> uimaSystemFindLoadedClass;
 //static {
 //  try {

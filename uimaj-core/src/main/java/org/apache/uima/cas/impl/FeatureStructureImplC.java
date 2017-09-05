@@ -216,7 +216,7 @@ public class FeatureStructureImplC implements FeatureStructureImpl {
     if (null == _typeImpl) {
       throw new CASRuntimeException(CASRuntimeException.JCAS_TYPE_NOT_IN_CAS, this.getClass().getName());
     }
-
+    
     if (_casView.maybeMakeBaseVersionForPear(this, _typeImpl)) {
       _setPearTrampoline();
     }
@@ -518,7 +518,7 @@ public class FeatureStructureImplC implements FeatureStructureImpl {
   public void setStringValue(Feature feat, String v) {
 //    if (IS_ENABLE_RUNTIME_FEATURE_VALIDATION) featureValidation(feat);  // done by _setRefValueCJ
 //    if (IS_ENABLE_RUNTIME_FEATURE_VALUE_VALIDATION) featureValueValidation(feat, v); // verifies feat can take a string
-    subStringRangeCheck(feat, v);
+    subStringRangeCheck(feat, v);  
     _setRefValueCJ((FeatureImpl) feat, v);
   }
   
@@ -890,11 +890,23 @@ public class FeatureStructureImplC implements FeatureStructureImpl {
    * @see java.lang.Object#equals(java.lang.Object)
    * must match hashCode
    * must match comparator == 0, equal == true
+   * Only valid for FSs in same CAS
    */
   @Override
   public boolean equals(Object obj) {
-    return (obj instanceof FeatureStructureImplC) &&
-            ((FeatureStructureImplC)obj)._id == this._id;
+    if (obj instanceof FeatureStructureImplC) {
+      FeatureStructureImplC c2 = (FeatureStructureImplC) obj;
+      if (_casView == null && c2._casView == null) {
+        return c2._id == this._id;  // special case for removed marker
+      }
+      if (_casView != null && c2._casView != null &&   
+           (_casView == c2._casView ||
+            _casView.getBaseCAS() == c2._casView.getBaseCAS())) {
+        return c2._id == this._id;
+      }
+    }
+//        throw new IllegalArgumentException("Can't invoke equals on two FS from different CASes.");
+    return false;
   }
 
 
@@ -1043,6 +1055,7 @@ public class FeatureStructureImplC implements FeatureStructureImpl {
    * @param printRefs -
    * @deprecated because uses StringBuffer, not builder, for version 2 compatibility only
    */
+  @Deprecated
   public void prettyPrint(
       int indent, 
       int incr, 
@@ -1059,18 +1072,44 @@ public class FeatureStructureImplC implements FeatureStructureImpl {
   }
   
   public void prettyPrint(
-      int indent, 
-      int incr, 
+      int indent,  // the current indent position
+      int incr,    // the delta to indent this FS printing
       StringBuilder buf, 
       boolean useShortNames, 
-      String s, 
+      String s, // carries the "#123" id refs for others to use, labels this fs with that.
       PrintReferences printRefs) {
+    prettyPrint(indent, incr, buf, useShortNames, s, printRefs, false);
+  }
+  
+  public void prettyPrintShort(StringBuilder sb) {
+    prettyPrint(0, 2, sb, true, "", new PrintReferences(), true);
+  }
+  
+  public void prettyPrint(
+      int indent,  // the current indent position
+      int incr,    // the delta to indent this FS printing
+      StringBuilder buf, 
+      boolean useShortNames, 
+      String s, // carries the "#123" id refs for others to use, labels this fs with that.
+      PrintReferences printRefs,
+      boolean isShortForm_arg) {  // short form only prints type:_id for refs
+    
+
+    final boolean isShortForm = 
+//        isShortForm_arg;
+        // debug
+//        (this._id == 2512)
+//          ? false
+//          : 
+            isShortForm_arg;
+    
     try {
     indent += incr;
     if (indent > 20) {
       buf.append(" ... past indent 20 ... ");
       return;
     }
+    getPrintRefs(printRefs, this);
     final int printInfo = printRefs.printInfo(this);
     if (printInfo != PrintReferences.NO_LABEL) {
       String label = printRefs.getLabel(this);
@@ -1078,7 +1117,7 @@ public class FeatureStructureImplC implements FeatureStructureImpl {
         buf.append(printRefs.getLabel(this));
       }
       if (printInfo == PrintReferences.JUST_LABEL) {
-        buf.append('\n');
+        buf.append(' ');  // was newline
         return;
       }
       buf.append(' ');
@@ -1148,42 +1187,63 @@ public class FeatureStructureImplC implements FeatureStructureImpl {
       printArrayElements(a.size(), i -> Double.toString(a.get(i)), indent, buf);
       return;
     }
-    }    
+    case TypeSystemConstants.fsArrayTypeCode: {
+      FSArray a = (FSArray) this;
+      printArrayElements(a.size(), 
+                         i -> ppArrayVal(a.get(i), incr, useShortNames, printRefs, isShortForm), 
+                         indent, 
+                         buf);
+      
+      return;
+    }  // end of case
+    }  // end of switch
+    
+    if (this instanceof FSArray) {  // catches instance of FSArrays which are "typed" to hold specific element types
+      FSArray a = (FSArray) this;
+      printArrayElements(a.size(), 
+                         i -> ppArrayVal(a.get(i), incr, useShortNames, printRefs, isShortForm), 
+                         indent, 
+                         buf);
+      return;
+    }
     
     for (FeatureImpl fi : _typeImpl.getFeatureImpls()) {
       StringUtils.printSpaces(indent, buf);
       buf.append(fi.getShortName() + ": ");
       TypeImpl range = (TypeImpl) fi.getRange();
-      
-      if (range.isStringOrStringSubtype()) {
-        String stringVal = getStringValue(fi);
-        stringVal = (null == stringVal) ? "<null>" : "\"" + Misc.elideString(stringVal, 15) + "\"";
-        buf.append(stringVal + '\n');
+      if (range.isPrimitive()) {
+        addStringOrPrimitive(buf, fi);
         continue;
       }
       
-      if (!range.isPrimitive()) {   
-        // not primitive
-        FeatureStructureImplC val = null;
-        boolean hadException = false;
-        try {
-          val = getFeatureValue(fi);
-        } catch (Exception e) {
-          buf.append("<exception ").append(e.getMessage()).append(">\n");
-          hadException = true;
-        }
-        if (!hadException) {
-          if (val != null && !val._typeImpl.getName().equals(CAS.TYPE_NAME_SOFA)) {
-            val.prettyPrint(indent, incr, buf, useShortNames, null, printRefs);
-          } else {
-            buf.append((val == null) ? "<null>\n" : ((SofaFS) val).getSofaID() + '\n'); 
-          }
-        }
-    
-      } else {  
-        // is primitive
-        buf.append(this.getFeatureValueAsString(fi) + "\n");
+      // not primitive
+      FeatureStructureImplC val = null;
+      boolean hadException = false;
+      try {
+        val = getFeatureValue(fi);
+      } catch (Exception e) {
+        buf.append("<exception ").append(e.getMessage()).append(">\n");
+        hadException = true;
       }
+      if (!hadException) {
+        if (isShortForm) {
+          if (null == val) {
+            buf.append("<null>");
+          } else {
+            buf.append(val._getTypeImpl().getShortName()).append(':').append(val._id);
+          }
+        } else {
+          ppval(val, indent, incr, buf, useShortNames, printRefs, false);          
+          buf.append('\n');
+        }
+        
+//          if (val != null && !val._typeImpl.getName().equals(CAS.TYPE_NAME_SOFA)) {
+//            val.prettyPrint(indent, incr, buf, useShortNames, null, printRefs);
+//          } else {
+//            buf.append((val == null) ? "<null>\n" : ((SofaFS) val).getSofaID() + '\n'); 
+//          }
+      }
+    
     }
     } catch (Exception e) {
       buf.append("**Caught exception: ").append(e);
@@ -1192,7 +1252,44 @@ public class FeatureStructureImplC implements FeatureStructureImpl {
 //      buf.append(sw.toString());
     }    
   }
+  
+  public StringBuilder addStringOrPrimitive(StringBuilder sb, FeatureImpl fi) {
+    TypeImpl range = (TypeImpl) fi.getRange();
+    
+    if (range.isStringOrStringSubtype()) {
+      String stringVal = getStringValue(fi);
+      stringVal = (null == stringVal) ? "<null>" : "\"" + Misc.elideString(stringVal, 80) + "\"";
+      sb.append(stringVal + '\n');
+    } else {
+      sb.append(this.getFeatureValueAsString(fi));
+    }
+    return sb;
+  }
+  
+  private void ppval(FeatureStructureImplC val, 
+                     int indent, 
+                     int incr, 
+                     StringBuilder buf, 
+                     boolean useShortNames, 
+                     PrintReferences printRefs,
+                     boolean isShortForm) {
+    if (val != null && !val._typeImpl.getName().equals(CAS.TYPE_NAME_SOFA)) {
+      val.prettyPrint(indent, incr, buf, useShortNames, null, printRefs, isShortForm);
+    } else {
+      buf.append((val == null) ? "<null>" : "sofa id: " +((SofaFS) val).getSofaID()); 
+    }    
+  }
 
+  private String ppArrayVal(FeatureStructureImplC val, 
+                            int incr, 
+                            boolean useShortNames, 
+                            PrintReferences printRefs, 
+                            boolean isShortForm) {
+    StringBuilder sb = new StringBuilder();
+    ppval(val, 0, incr, sb, useShortNames, printRefs, isShortForm);
+    return sb.toString();
+  }
+  
   private void printArrayElements(int arrayLen, IntFunction<String> f, int indent, StringBuilder buf) {
     StringUtils.printSpaces(indent, buf);
     buf.append("Array length: " + arrayLen + "\n");
@@ -1209,7 +1306,7 @@ public class FeatureStructureImplC implements FeatureStructureImpl {
         if (null == element) {
           buf.append("null");
         } else {
-          buf.append("\"" + Misc.elideString(element, 15) + "\"");
+          buf.append("\"" + Misc.elideString(element, 50) + "\"");  // was 15
         }
       }
       

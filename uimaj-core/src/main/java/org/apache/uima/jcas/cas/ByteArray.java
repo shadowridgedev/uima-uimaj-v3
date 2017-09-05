@@ -19,10 +19,12 @@
 
 package org.apache.uima.jcas.cas;
 
+import java.util.Arrays;
 import java.util.Iterator;
 import java.util.NoSuchElementException;
 
 import org.apache.uima.cas.ByteArrayFS;
+import org.apache.uima.cas.CAS;
 import org.apache.uima.cas.CommonArrayFS;
 import org.apache.uima.cas.impl.ByteArrayFSImpl;
 import org.apache.uima.cas.impl.CASImpl;
@@ -34,7 +36,7 @@ import org.apache.uima.jcas.JCasRegistry;
 public final class ByteArray extends TOP implements CommonPrimitiveArray, ByteArrayFSImpl, Iterable<Byte> {
 
   /* public static string for use where constants are needed, e.g. in some Java Annotations */
-  public final static String _TypeName = "org.apache.uima.cas.jcas.ByteArray";
+  public final static String _TypeName = CAS.TYPE_NAME_BYTE_ARRAY;
 
   /**
    * Each cover class when loaded sets an index. Used in the JCas typeArray to go from the cover
@@ -129,7 +131,7 @@ public final class ByteArray extends TOP implements CommonPrimitiveArray, ByteAr
    * @see org.apache.uima.cas.ByteArrayFS#toArray()
    */
   public byte[] toArray() {
-    return theArray.clone();
+    return Arrays.copyOf(theArray, theArray.length);
   }
 
   /** return the size of the array */
@@ -205,7 +207,7 @@ public final class ByteArray extends TOP implements CommonPrimitiveArray, ByteAr
    * @param a the source for the array's initial values
    * @return a newly created and populated array
    */
-  public static ByteArray createFromArray(JCas jcas, byte[] a) {
+  public static ByteArray create(JCas jcas, byte[] a) {
     ByteArray byteArray = new ByteArray(jcas, a.length);
     byteArray.copyFromArray(a, 0, 0, a.length);
     return byteArray;

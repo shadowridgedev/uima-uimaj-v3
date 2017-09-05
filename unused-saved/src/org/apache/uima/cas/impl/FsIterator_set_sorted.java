@@ -27,9 +27,15 @@ import java.util.NoSuchElementException;
 import org.apache.uima.cas.FSIterator;
 import org.apache.uima.cas.FeatureStructure;
 import org.apache.uima.internal.util.CopyOnWriteOrderedFsSet_array;
+import org.apache.uima.internal.util.Misc;
 import org.apache.uima.jcas.cas.TOP;
 
 /**
+ * NOTE: This class is no longer used; instead, the callers which created instances of this class now 
+ * create instances of OrderedFsSort_array.LL_iterator.
+ * 
+ * 
+ * 
  * @param <T> the type of FSs being returned from the iterator, supplied by the calling context
  */
 class FsIterator_set_sorted<T extends FeatureStructure> extends FsIterator_singletype<T> {
@@ -61,6 +67,7 @@ class FsIterator_set_sorted<T extends FeatureStructure> extends FsIterator_singl
     super(ti, comp);
     this.fsSetSortIndex = fsSetSortIndex;
     moveToFirst();
+    Misc.internalError();  // class superseded
   }
 
   @Override
@@ -71,7 +78,7 @@ class FsIterator_set_sorted<T extends FeatureStructure> extends FsIterator_singl
 //    fsSetSortIndex.maybeProcessBulkAdds();
     this.navSet = (NavigableSet<TOP>) fsSetSortIndex.getNonNullCow();
     iterator = (Iterator<T>) navSet.iterator();  // in case iterator was reverse, etc.
-    resetConcurrentModification(); // follow create of iterator, which, in turn, does any pending batch processing
+//    resetConcurrentModification(); // follow create of iterator, which, in turn, does any pending batch processing
     isGoingForward = true;
     isCurrentElementFromLastGet = false;
   }
@@ -81,17 +88,9 @@ class FsIterator_set_sorted<T extends FeatureStructure> extends FsIterator_singl
 //    fsSetSortIndex.maybeProcessBulkAdds();
     this.navSet = (NavigableSet<TOP>) fsSetSortIndex.getNonNullCow();
     iterator =  (Iterator<T>) navSet.descendingIterator();
-    resetConcurrentModification(); // follow create of iterator, which, in turn, does any pending batch processing
+//    resetConcurrentModification(); // follow create of iterator, which, in turn, does any pending batch processing
     isGoingForward = false;
     isCurrentElementFromLastGet = false;
-  }
-
-  @Override
-  public void moveToNext() {
-    if (!isValid()) {
-      return;
-    }
-    moveToNextNvc();
   }
   
   @Override
@@ -117,16 +116,6 @@ class FsIterator_set_sorted<T extends FeatureStructure> extends FsIterator_singl
     }
   }
 
-
-  @Override
-  public void moveToPrevious() {
-    if (!isValid()) {
-      return;
-    }
-    
-    moveToPreviousNvc();
-  }
-  
   @Override
   public void moveToPreviousNvc() {
     if (!isGoingForward) {
@@ -151,25 +140,12 @@ class FsIterator_set_sorted<T extends FeatureStructure> extends FsIterator_singl
   }
 
   @Override
-  public T get() {
-    if (!isValid()) {
-      throw new NoSuchElementException();
-    }
-    if (!isCurrentElementFromLastGet) {      
-      currentElement = iterator.next();
-      isCurrentElementFromLastGet = true;
-    }
-    maybeTraceCowUsingCopy(fsSetSortIndex, (CopyOnWriteIndexPart) navSet); 
-    return currentElement;
-  }
-
-  @Override
   public T getNvc() {
     if (!isCurrentElementFromLastGet) {
-      maybeTraceCowUsingCopy(fsSetSortIndex, (CopyOnWriteIndexPart) navSet);
       currentElement = iterator.next();
       isCurrentElementFromLastGet = true;
     }
+    maybeTraceCowUsingCopy(fsSetSortIndex, (CopyOnWriteIndexPart) navSet);
     return currentElement;
   }
 
@@ -229,7 +205,7 @@ class FsIterator_set_sorted<T extends FeatureStructure> extends FsIterator_singl
     }
     
     iterator = (Iterator<T>) navSet.tailSet(elementBefore, false).iterator();
-    resetConcurrentModification(); // follow create of iterator, which, in turn, does any pending batch processing
+//    resetConcurrentModification(); // follow create of iterator, which, in turn, does any pending batch processing
     return;
   }
     
@@ -251,10 +227,10 @@ class FsIterator_set_sorted<T extends FeatureStructure> extends FsIterator_singl
     return fsSetSortIndex;
   }
   
-  @Override
-  protected int getModificationCountFromIndex() {
-    return ((CopyOnWriteOrderedFsSet_array)navSet).getModificationCount();
-  }
+//  @Override
+//  protected int getModificationCountFromIndex() {
+//    return ((CopyOnWriteOrderedFsSet_array)navSet).getModificationCount();
+//  }
   
   /* (non-Javadoc)
    * @see org.apache.uima.cas.impl.LowLevelIterator#isIndexesHaveBeenUpdated()
@@ -262,6 +238,26 @@ class FsIterator_set_sorted<T extends FeatureStructure> extends FsIterator_singl
   @Override
   public boolean isIndexesHaveBeenUpdated() {
     return navSet != fsSetSortIndex.getCopyOnWriteIndexPart();
+  }
+
+  @Override
+  public boolean maybeReinitIterator() {
+    throw Misc.internalError();  // not yet done
+  }
+
+  @Override
+  public void moveToFirstNoReinit() {
+    Misc.internalError();  // not yet done
+  }
+
+  @Override
+  public void moveToLastNoReinit() {
+    Misc.internalError();  // not yet done
+  }
+
+  @Override
+  public void moveToNoReinit(FeatureStructure fs) {
+    Misc.internalError();  // not yet done
   }
 
 }

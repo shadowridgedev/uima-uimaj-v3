@@ -701,6 +701,7 @@ public class XmiCasDeserializer {
             todo.add(fs);   // https://issues.apache.org/jira/browse/UIMA-4099
           } else {
             if (!lenient) {
+              if (xmiId == 0) report0xmiId();  //debug
               throw createException(XCASParsingException.UNKNOWN_ID, Integer.toString(xmiId));
             }
             else {
@@ -726,7 +727,8 @@ public class XmiCasDeserializer {
       }
       // translate sofa's xmi:id into its sofanum
       Sofa sofa = (Sofa) maybeGetFsForXmiId(sofaXmiId);
-      if (null == sofa) {        
+      if (null == sofa) {
+        if (sofaXmiId == 0) report0xmiId();  //debug
         throw createException(XCASParsingException.UNKNOWN_ID, Integer.toString(sofaXmiId));
       }
       return (FSIndexRepositoryImpl) indexRepositories.get(sofa.getSofaNum());
@@ -791,6 +793,7 @@ public class XmiCasDeserializer {
         	  localRemoves.add(fs);     // https://issues.apache.org/jira/browse/UIMA-4099
         	} else {
         	  if (!lenient) {
+        	    if (xmiId == 0) report0xmiId();  //debug
               throw createException(XCASParsingException.UNKNOWN_ID, Integer.toString(xmiId));
             } else {
         		//unknown view member may be an OutOfTypeSystem FS
@@ -1816,7 +1819,7 @@ public class XmiCasDeserializer {
     
     private void finalizeRefValue(int xmiId, TOP fs, FeatureImpl fi) throws XCASParsingException {
       TOP tgtFs = maybeGetFsForXmiId(xmiId);
-      if (null == tgtFs) {
+      if (null == tgtFs && xmiId != 0) { // https://issues.apache.org/jira/browse/UIMA-5446
         if (!lenient) {
           throw createException(XCASParsingException.UNKNOWN_ID, Integer.toString(xmiId));
         } else {
@@ -1833,7 +1836,7 @@ public class XmiCasDeserializer {
    
     private void finalizeFSListRefValue(int xmiId, NonEmptyFSList neNode) throws XCASParsingException {
       TOP tgtFs = maybeGetFsForXmiId(xmiId);
-      if (null == tgtFs) {
+      if (null == tgtFs && xmiId != 0) { // https://issues.apache.org/jira/browse/UIMA-5446
         if (!lenient) {
           throw createException(XCASParsingException.UNKNOWN_ID, Integer.toString(xmiId));
         } else {
@@ -1850,7 +1853,7 @@ public class XmiCasDeserializer {
     
     private void finalizeFSArrayRefValue(int xmiId, FSArray fsArray, int index) throws XCASParsingException {
       TOP tgtFs = maybeGetFsForXmiId(xmiId);
-      if (null == tgtFs) {
+      if (null == tgtFs && xmiId != 0) {  // https://issues.apache.org/jira/browse/UIMA-5446
         if (!lenient) {
           throw createException(XCASParsingException.UNKNOWN_ID, Integer.toString(xmiId));
         } else {
@@ -2424,5 +2427,9 @@ public class XmiCasDeserializer {
     }
   }    
 
-
+  private void report0xmiId() {
+    Throwable t = new Throwable();
+    System.err.println("Debug 0 xmiId encountered where not expected");
+    t.printStackTrace();
+  }
 }

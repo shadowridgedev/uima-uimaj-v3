@@ -16,19 +16,17 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-
-package org.apache.uima.cas.impl;
+package org.apache.uima.cas;
 
 /**
- * A version of TypeImpl for types that are JavaObject types
- * Note: these are non-creatable (as FeatureStructures), but they may be the
- * values of Feature slots.
- *
+ * There are 4 kinds of comparators
+ *   for the combinations of comparing
+ *     - with or without the "id"
+ *     - with or without type order (with only includes typeOrder if there is such a key included) 
  */
-public class TypeImpl_javaObject extends TypeImpl_primitive {
-  
-  public TypeImpl_javaObject(String name, TypeSystemImpl tsi, TypeImpl supertype, Class<?> javaClass) {
-    super(name, tsi, supertype, javaClass);
-  }
-  
+public enum FSComparators {
+    WITH_ID,             // include the id in the comparator
+    WITHOUT_ID,          // no          id in the comparator
+    WITH_TYPE_ORDER,     // include the typeOrder in the comparator
+    WITHOUT_TYPE_ORDER   // no          typeOrder in the comparator
 }

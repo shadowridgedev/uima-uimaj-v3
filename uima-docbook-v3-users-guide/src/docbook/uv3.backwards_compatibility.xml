@@ -55,9 +55,19 @@ under the License.
     
     <para>The non-JCas Java cover classes for the built-in UIMA types remain, for backwards compatibility.
       So, if you have code that casts a Feature Structure instance to AnnotationImpl (a now deprecated 
-      version 2 non-JCas Java cover class), that will continue to work.
-      
-      </para>
+      version 2 non-JCas Java cover class), that will continue to work.  
+    </para>
+    
+    <section id="uv3.backwards_compatibility.jcas.names">  
+    <title>Additional reserved names in the JCas generated classes</title>
+    <titleabbrev>JCas reserved names</titleabbrev>
+
+    <para>Names beginning with "_" (underscore) are being used by the new JCas implementation, so you should not
+      name things with this convention.  If you do, please insure your names are not colliding with the names
+      being used by the generated JCas files.
+    </para>
+    
+    </section>
   </section>
   
   
@@ -86,7 +96,7 @@ under the License.
 	  
   </section>
   
-  <section id="uv3.backards_compatibility.low_level_apis">
+  <section id="uv3.backwards_compatibility.low_level_apis">
     <title>APIs for creating and modifying Feature Structures</title>
     
     <para>There are 3 sets of APIs for creating and modifying Feature Structures;
@@ -122,7 +132,7 @@ under the License.
     
   </section>
   
-  <section id="uv3.backards_compatibility.PEARs">
+  <section id="uv3.backwards_compatibility.PEARs">
     <title>PEAR support</title>   
     
     <para>Pears are supported in Version 3.  If they use JCas, their JCas classes need to be migrated.
@@ -163,7 +173,7 @@ under the License.
     <para>The workaround for this is to manually merge any JCas class definitions for the same class.</para>
   </section>
   
-  <section id="uv3.backards_compatibility.toString">
+  <section id="uv3.backwards_compatibility.toString">
     <title>toString()</title>   
     
     <para>
@@ -174,7 +184,7 @@ under the License.
     </para>
   </section>
   
-  <section id="uv3.backards_compatibility.logging">
+  <section id="uv3.backwards_compatibility.logging">
     <title>Logging configuration is somewhat different</title>   
     
     <para>The default logging configuration in v2 was to use Java Util Logging (the logger built into Java).
@@ -195,7 +205,8 @@ under the License.
       For more details, please see the logging chapter.
     </para>
   </section>
-  <section id="uv3.backards_compatibility.typesystem_sharing">
+  
+  <section id="uv3.backwards_compatibility.typesystem_sharing">
     <title>Type System sharing</title>   
     
     <para>Type System definitions are shared when they are equal.  After type systems 
@@ -216,7 +227,7 @@ under the License.
     one being committed.</para>
   </section>
   
-  <section id="uv3.backards_compatibility.checking">
+  <section id="uv3.backwards_compatibility.checking">
     <title>Some checks moved to native Java</title>   
     
     <para>In the interest of performance, some duplicate checks, such as whether an array index is within bounds, 
@@ -226,7 +237,7 @@ under the License.
     </para>
   </section>
   
-  <section id="uv3.backards_compatibility.class_hierarchy">
+  <section id="uv3.backwards_compatibility.class_hierarchy">
     <title>Some class hierarchies have been modified</title>   
     
     <para>The various JCas Classes implementing the built-ins for arrays have some additional

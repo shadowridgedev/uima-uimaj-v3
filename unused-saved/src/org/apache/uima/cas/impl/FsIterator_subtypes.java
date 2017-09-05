@@ -19,19 +19,16 @@
 
 package org.apache.uima.cas.impl;
 
-import java.util.NoSuchElementException;
-
-import org.apache.uima.cas.FSIterator;
 import org.apache.uima.cas.FeatureStructure;
-import org.apache.uima.jcas.cas.TOP;
 
 
-public abstract class FsIterator_subtypes<T extends FeatureStructure> implements LowLevelIterator<T> {
+public abstract class FsIterator_subtypes<T extends FeatureStructure> extends FsIterator_multiple_indexes<T> {
 
   // The IICP
   final protected FsIndex_iicp<T> iicp;
  
   public FsIterator_subtypes(FsIndex_iicp<T> iicp) {
+    super(iicp.getIterators());
     this.iicp = iicp;
   } 
   
@@ -54,7 +51,7 @@ public abstract class FsIterator_subtypes<T extends FeatureStructure> implements
     TypeImpl type = (TypeImpl) this.ll_getIndex().getType();
     StringBuilder sb = new StringBuilder(this.getClass().getSimpleName()).append(":").append(System.identityHashCode(this));
     sb.append(" over Type: ").append(type.getName()).append(":").append(type.getCode());
-    sb.append(", size: ").append(this.ll_indexSize());
+    sb.append(", index size: ").append(this.ll_indexSize());
     return sb.toString();
   }
   

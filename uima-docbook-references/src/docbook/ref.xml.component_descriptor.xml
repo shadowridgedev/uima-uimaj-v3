@@ -154,7 +154,8 @@ under the License.
       <programlisting>
 ResourceManager resMgr = UIMAFramework.newDefaultResourceManager();
 resMgr.setDataPath(yourPathString);
-AnalysisEngine ae = UIMAFramework.produceAnalysisEngine(desc, resMgr, null);
+AnalysisEngine ae = 
+  UIMAFramework.produceAnalysisEngine(desc, resMgr, null);
 </programlisting></para>
     
     <para>The default datapath for the entire JVM can be set via the
@@ -690,7 +691,8 @@ uima.tcas.Annotation.</programlisting>
               Information in the CAS is always accessed through an index. There is a built-in default annotation
               index declared which can be used to access instances of type
               <literal>uima.tcas.Annotation</literal> (or its subtypes), sorted based on their
-              <literal>begin</literal> and <literal>end</literal> features. For all other types, there is a
+              <literal>begin</literal> and <literal>end</literal> features, and the type priority ordering (if specified). 
+              For all other types, there is a
               default, unsorted (bag) index. If there is a need for a specialized index it must be declared in this
               element of the descriptor. See <olink targetdoc="&uima_docs_ref;"
                 targetptr="ugr.ref.cas.indexes_and_iterators"/> for details on FS indexes.</para>
@@ -739,7 +741,7 @@ uima.tcas.Annotation.</programlisting>
               <literal>&lt;kind&gt;</literal> of index. Sorted indexes enforce an
               ordering of feature structures, based on defined keys.  Bag indexes do
               not enforce ordering, and have no defined keys. Set indexes do not
-              enforce ordering, but use defined keys to specify equivalnce classes; 
+              enforce ordering, but use defined keys to specify equivalence classes; 
               addToIndexes will not add a Feature Structure to a set index if its keys 
               match those of an entry of the same type already in the index.
               If the <literal>&lt;kind&gt;</literal>element is omitted, it will default to
@@ -1960,9 +1962,12 @@ uima.tcas.Annotation.</programlisting>
             <para>
             The settings for all descriptors in a pipeline are usually loaded from one or more files
             whose names are obtained from the Java system property <emphasis>UimaExternalOverrides</emphasis>.
-            The value of the property must be a list of file names, each separated by a single comma 
-            e.g. <literal>&minus;DUimaExternalOverrides=file1.settings,file2.settings</literal>.
-            If a file is not in the filesystem and is a relative reference, both the datapath and classpath are searched.
+            The value of the property must be a comma-separated list of resource names.  If the name
+            has a prefix of "file:" or no prefix, the filesystem is searched.  If the name has a
+            prefix of "path:" the rest must be a Java-style dotted name, similar to the name
+            attribute for descriptor imports.  The dots are replaced by file separators and a suffix
+            of ".settings" is appended before searching the datapath and classpath.
+            e.g. <literal>&minus;DUimaExternalOverrides=/data/file1.settings,file:relative/file2.settings,path:org.apache.uima.resources.file3</literal>.
             </para>
 
             <para>
