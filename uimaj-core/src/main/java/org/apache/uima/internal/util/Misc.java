@@ -228,7 +228,7 @@ public class Misc {
     boolean mustBeDirectory = false;
     if (p.endsWith("*")) {
       if (p.length() < 2 || p.charAt(p.length() - 2) != File.separatorChar) {
-        UIMAFramework.getLogger().error("Path Specification \"{0}\" invalid.", p);
+        UIMAFramework.getLogger().error("Path Specification \"{}\" invalid.", p);
         throw new MalformedURLException();
       }
       p = p.substring(0, p.length() - 2);
@@ -248,13 +248,13 @@ public class Misc {
         }
       }
     } else if (mustBeDirectory) {
-      UIMAFramework.getLogger().error("Path Specification \"{0}\" must be a directory.", p);
+      UIMAFramework.getLogger().error("Path Specification \"{}\" must be a directory.", p);
       throw new MalformedURLException();
     } else if (p.toLowerCase().endsWith(".jar")) {
       addPathToURLs(urls, pf);
     } else {
       // have a segment which does not denote a jar - skip it but note that 
-      UIMAFramework.getLogger().warn("Skipping adding \"{0}\" to URLs", p);
+      UIMAFramework.getLogger().warn("Skipping adding \"{}\" to URLs because it is not a directory or a JAR", p);
     }
   }
   
@@ -552,6 +552,19 @@ public class Misc {
     } 
   }
   
+  static public int getPrivateStaticIntFieldNoInherit(Class<?> clazz, String fieldName) {
+    try {
+      Field f = clazz.getDeclaredField(fieldName);
+      f.setAccessible(true);
+      return f.getInt(null);
+    } catch (NoSuchFieldException e) {
+      return Integer.MIN_VALUE;
+    } catch (SecurityException | IllegalArgumentException | IllegalAccessException e) {
+        throw new RuntimeException(e);
+    } 
+  }
+  
+  
   static public void addAll(Collection<String> c, String ... v) {
     for (String s : v) {
       c.add(s);
@@ -631,6 +644,13 @@ public class Misc {
     return c;
   }
 
+  /**
+   * Get item from array list.  If index is &gt; length, expand the array, and return null
+   * @param a the list
+   * @param i the index
+   * @param <T> the type of the items in the list
+   * @return the item at the index or null
+   */
   public static <T> T getWithExpand(List<T> a, int i) {
     while (i >= a.size()) {
       a.add(null);

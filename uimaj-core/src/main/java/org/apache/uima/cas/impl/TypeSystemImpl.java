@@ -33,7 +33,12 @@ import static org.apache.uima.cas.impl.SlotKinds.SlotKind.Slot_Short;
 import static org.apache.uima.cas.impl.SlotKinds.SlotKind.Slot_ShortRef;
 import static org.apache.uima.cas.impl.SlotKinds.SlotKind.Slot_StrRef;
 
+import java.lang.invoke.MethodHandle;
+import java.lang.invoke.MethodHandles;
+import java.lang.invoke.MethodType;
+import java.lang.invoke.MutableCallSite;
 import java.lang.ref.WeakReference;
+import java.util.AbstractMap;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -43,6 +48,7 @@ import java.util.IdentityHashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Set;
 import java.util.Vector;
 import java.util.WeakHashMap;
@@ -142,6 +148,8 @@ public class TypeSystemImpl implements TypeSystem, TypeSystemMgr, LowLevelTypeSy
 //  private final static boolean IS_DECOMPILE_JCAS = Misc.getNoValueSystemProperty(DECOMPILE_JCAS);
 //  private final static Set<String> decompiled = (IS_DECOMPILE_JCAS) ? new HashSet<String>(256) : null;
     
+  static private final MethodHandle MHC_MINUS_1 = MethodHandles.constant(int.class, -1);
+  
   /**
    * Type code that is returned on unknown type names.
    */
@@ -422,7 +430,7 @@ public class TypeSystemImpl implements TypeSystem, TypeSystemMgr, LowLevelTypeSy
    *   Excludes FsGeneratorArrays - those are built-in and constant 
    */
   private final Map<ClassLoader, FsGenerator3[]> generatorsByClassLoader = new IdentityHashMap<>();
-
+  
   public TypeSystemImpl() {
 
     // set up meta info (TypeImpl) for built-in types
@@ -1361,6 +1369,7 @@ public class TypeSystemImpl implements TypeSystem, TypeSystemMgr, LowLevelTypeSy
         committedTypeSystems.put(this, new WeakReference<>(this));
       }
 
+      FSClassRegistry.loadAtTypeSystemCommitTime(this, true, cl);
       return this;
     } // of sync block 
   }
@@ -2569,15 +2578,21 @@ public class TypeSystemImpl implements TypeSystem, TypeSystemMgr, LowLevelTypeSy
   public static synchronized int getAdjustedFeatureOffset(String featName) {
     TypeImpl type = typeBeingLoadedThreadLocal.get();
     if (null == type) {
-      /*A JCas class field "{0}" is being initialized by non-framework (user) code before Type System Commit 
-       * for a type system with a corresponding type. 
-       * Either change the user load code to not do initialize, or to defer it until after the type system commit.*/
-      throw new CASRuntimeException(CASRuntimeException.JCAS_CLASS_INITIALIZED_BEFORE_TYPE_SYSTEM_COMMIT, featName);
+      /*A JCas class is being loaded and initialized (by non-framework user code) before 
+       * the type system with the corresponding type has been set up and committed.
+       * This is not allowed in UIMA v3 because the static class initialization code needs access to
+       * the type system in order to bridge the JCas class definition to the 
+       * corresponding type system type.
+       * You can fix this by reordering your code to do the commit for the type system first, or 
+       * if you're using a form like Class.forName("myJCasClass"), you can use the alternative
+       * API which only loads (but doesn't run the initialization: 
+       * Class.forName("myJCasClass", false, this.getClass().getClassLoader()).*/
+      throw new CASRuntimeException(CASRuntimeException.JCAS_CLASS_INITIALIZED_BEFORE_TYPE_SYSTEM_COMMIT);
     }
     FeatureImpl fi = type.getFeatureByBaseName(featName);
     return (fi == null) ? -1 : fi.getAdjustedOffset();
   }
-  
+    
   /**
    * When deserializing Xmi and XCAS, Arrays of Feature Structures are encoded as FSArray types, but they
    * may have a more restrictive typing, e.g. arrays of Annotation, with the type code of Annotation[].
@@ -2603,7 +2618,7 @@ public class TypeSystemImpl implements TypeSystem, TypeSystemMgr, LowLevelTypeSy
    */
   public FsGenerator3[] getGeneratorsForClassLoader(ClassLoader cl, boolean isPear) {
     synchronized (generatorsByClassLoader) {
-      FsGenerator3[] g = generatorsByClassLoader.get(cl);
+      FsGenerator3[] g = generatorsByClassLoader.get(cl); // a separate map per type system instance
       if (g == null) {
         g = FSClassRegistry.getGeneratorsForClassLoader(cl, isPear, this);
         generatorsByClassLoader.put(cl, g);
@@ -2611,7 +2626,30 @@ public class TypeSystemImpl implements TypeSystem, TypeSystemMgr, LowLevelTypeSy
       return g;
     }
   }
-  
+    
+  /**
+   * Creates and returns a new MutableCallSite, 
+   * recording it in list of all callsites for this type, in a map by typename
+   * 
+   * Done this way because 
+   *   - can't be a classloader-wide list of call sites - some might not be associated with this type system
+   *   - can't be a typesystem-wide list of call sites - the JCas class might be used by multiple type systems
+   *     and the first one to load it would set this value.
+   *   - has to be pairs of feature name, call-site, in order to get the value to set, later
+   *   --  doesn't need to be a hashmap, can be an arraylist of entry
+   *   Type being loaded may not be known at this point.
+   * @param clazz the JCas class
+   * @param featName the short name of the feature
+   * @return the created callsite
+   */
+  public static MutableCallSite createCallSite(Class<? extends TOP> clazz, String featName) {
+    MutableCallSite callSite = new MutableCallSite(MethodType.methodType(int.class)); 
+    callSite.setTarget(MHC_MINUS_1);  // for error checking
+    ArrayList<Entry<String, MutableCallSite>> callSitesForType = FSClassRegistry.callSites_all_JCasClasses.computeIfAbsent(clazz, k -> new ArrayList<>());
+    callSitesForType.add(new AbstractMap.SimpleEntry<String, MutableCallSite>(featName, callSite));
+    return callSite;
+  }
+
 //  /**
 //   * Get a list of types which have OID feature, filtered down to being just the top-most
 //   * (in the type hierarchy)
