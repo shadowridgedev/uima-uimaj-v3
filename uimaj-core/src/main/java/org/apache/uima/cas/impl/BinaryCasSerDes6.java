@@ -1887,9 +1887,18 @@ public class BinaryCasSerDes6 implements SlotKindsConstants {
            */
 
           if (srcTs.sofaType == srcType) {
-            currentFs = cas.createSofa(sofaNum, sofaName, sofaMimeType);  
+            if (cas.hasView(sofaName)) {
+              // sofa was already created, by an annotationBase subtype deserialized prior to this one
+              currentFs = (TOP) cas.getView(sofaName).getSofa();
+            } else {
+              currentFs = cas.createSofa(sofaNum, sofaName, sofaMimeType);
+            }
           } else {
-            CASImpl view = (CASImpl) cas.getView(sofaRef);
+            
+            CASImpl view = (null == sofaRef) 
+                             ? cas.getInitialView()  // https://issues.apache.org/jira/browse/UIMA-5588
+                             : (CASImpl) cas.getView(sofaRef);
+                             
             if (srcType.getCode() == TypeSystemConstants.docTypeCode) {
               currentFs = view.getDocumentAnnotation();  // creates the document annotation if it doesn't exist
               // we could remove this from the indexes until deserialization is over, but then, other calls to getDocumentAnnotation
@@ -2103,8 +2112,10 @@ public class BinaryCasSerDes6 implements SlotKindsConstants {
     case Slot_HeapRef:
       final int vh = readDiffIntSlot(storeIt, tgtFeatOffset, kind, tgtType);
       if (srcTs.annotBaseSofaFeat == srcFeat) {
-        sofaRef = (Sofa) getRefVal(vh);
-      } else {
+        sofaRef = (Sofa) getRefVal(vh);  // if sofa hasn't yet been deserialized, will be null
+      }
+      
+      if (srcTs.annotBaseSofaFeat != srcFeat || sofaRef == null) { https://issues.apache.org/jira/browse/UIMA-5588
         maybeStoreOrDefer(storeIt, fs, (lfs) -> { 
         
           // outer defer done if fs is null; it is a one-feature-structure defer for sofa or subtypes of annotationbase
@@ -2154,7 +2165,7 @@ public class BinaryCasSerDes6 implements SlotKindsConstants {
             break;
           }
           if (srcFeat == srcTs.sofaString) {
-            maybeStoreOrDefer(storeIt, fs, lfs -> ((Sofa)lfs).setLocalSofaData(vString));
+            maybeStoreOrDefer(storeIt, fs, lfs -> ((Sofa)lfs).setLocalSofaDataNoDocAnnotUpdate(vString));
             break;
           }
         }
@@ -2843,7 +2854,7 @@ public class BinaryCasSerDes6 implements SlotKindsConstants {
       processFSsForView(true,  // is enqueue
         isSerializingDelta 
           ? view.indexRepository.getAddedFSs().stream()
-          : view.indexRepository.<TOP>getAllIndexedFS(topType).stream());
+          : view.indexRepository.<TOP>getIndexedFSs(topType).stream());
       if (isSerializingDelta) {
         // for write/delta, write out (but don't enqueue) the deleted/reindexed FSs
         processFSsForView(false, view.indexRepository.getDeletedFSs().stream());

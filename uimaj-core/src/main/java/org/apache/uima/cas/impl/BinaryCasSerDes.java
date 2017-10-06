@@ -46,7 +46,6 @@ import org.apache.uima.internal.util.IntVector;
 import org.apache.uima.internal.util.Misc;
 import org.apache.uima.internal.util.Obj2IntIdentityHashMap;
 import org.apache.uima.internal.util.function.Consumer_T_int_withIOException;
-import org.apache.uima.internal.util.function.DeserBinaryIndexes;
 import org.apache.uima.jcas.cas.BooleanArray;
 import org.apache.uima.jcas.cas.ByteArray;
 import org.apache.uima.jcas.cas.DoubleArray;
@@ -576,7 +575,7 @@ public class BinaryCasSerDes {
           CASMgrSerializer cms = (embeddedCasMgrSerializer != null) ? embeddedCasMgrSerializer : casMgrSerializer; 
           TypeSystemImpl tsRead = (cms != null) ? cms.getTypeSystem() : null;
           if (null != tsRead) {
-            tsRead = tsRead.commit();  // jcas initialized, but no generators for this cas set up
+            tsRead = tsRead.commit(baseCas.getJCasClassLoader()); // https://issues.apache.org/jira/browse/UIMA-5598
           }
             
           TypeSystemImpl ts_for_decoding =
@@ -1027,57 +1026,57 @@ public class BinaryCasSerDes {
     return heapsz;
   }
 
-  /**
-   * gets number of views, number of sofas,
-   * For all sofas, 
-   *   adds them to the index repo in the base index
-   *   registers the sofa
-   * insures initial view created
-   * for all views:
-   *   does the view action and updates the documentannotation
-   * @param fsIndex the index info except for the actual list of FSs to reindex
-   * @param fss the lists of FSs to reindex (concatenated add/remove, or just adds if not delta)
-   * @param viewAction
-   */
-  void reinitIndexedFSs_common(int[] fsIndex, List<TOP> fss, DeserBinaryIndexes viewAction) {
-    // Add FSs to index repository for base CAS
-    int numViews = fsIndex[0];
-    int loopLen = fsIndex[1]; // number of sofas, not necessarily the same as
-    // number of views
-    // because the initial view may not have a sofa
-    for (int i = 0; i < loopLen; i++) { // iterate over all the sofas,
-      baseCas.indexRepository.addFS(fss.get(i)); // add to base index
-    }
-    
-
-    baseCas.forAllSofas(sofa -> {
-      String id = sofa.getSofaID();
-      if (CAS.NAME_DEFAULT_SOFA.equals(id)) { // _InitialView
-        baseCas.registerInitialSofa();
-        baseCas.addSofaViewName(id);
-      }
-      // next line the getView as a side effect
-      // checks for dupl sofa name, and if not,
-      // adds the name to the sofaNameSet
-      ((CASImpl) baseCas.getView(sofa)).registerView(sofa);
-    });
-    
-    baseCas.getInitialView();  // done for side effect of creating the initial view if not present
-    // must be done before the next line, because it sets the
-    // viewCount to 1.
-    baseCas.setViewCount(numViews); // total number of views
-    
-    int fsIndexIdx = 2;
-    for (int viewNbr = 1; viewNbr <= numViews; viewNbr++) {
-      CASImpl view = (viewNbr == 1) ? (CASImpl) baseCas.getInitialView() : (CASImpl) baseCas.getView(viewNbr);
-      if (view != null) {
-        fsIndexIdx += (1 + viewAction.apply(fsIndexIdx, view));
-        view.updateDocumentAnnotation();   // noop if sofa local data string == null
-      } else {
-        fsIndexIdx += 1;
-      }
-    }
-  }
+//  /**
+//   * gets number of views, number of sofas,
+//   * For all sofas, 
+//   *   adds them to the index repo in the base index
+//   *   registers the sofa
+//   * insures initial view created
+//   * for all views:
+//   *   does the view action and updates the documentannotation
+//   * @param fsIndex the index info except for the actual list of FSs to reindex
+//   * @param fss the lists of FSs to reindex (concatenated add/remove, or just adds if not delta)
+//   * @param viewAction
+//   */
+//  void reinitIndexedFSs_common(int[] fsIndex, List<TOP> fss, DeserBinaryIndexes viewAction) {
+//    // Add FSs to index repository for base CAS
+//    int numViews = fsIndex[0];
+//    int loopLen = fsIndex[1]; // number of sofas, not necessarily the same as
+//    // number of views
+//    // because the initial view may not have a sofa
+//    for (int i = 0; i < loopLen; i++) { // iterate over all the sofas,
+//      baseCas.indexRepository.addFS(fss.get(i)); // add to base index
+//    }
+//    
+//
+//    baseCas.forAllSofas(sofa -> {
+//      String id = sofa.getSofaID();
+//      if (CAS.NAME_DEFAULT_SOFA.equals(id)) { // _InitialView
+//        baseCas.registerInitialSofa();
+//        baseCas.addSofaViewName(id);
+//      }
+//      // next line the getView as a side effect
+//      // checks for dupl sofa name, and if not,
+//      // adds the name to the sofaNameSet
+//      ((CASImpl) baseCas.getView(sofa)).registerView(sofa);
+//    });
+//    
+//    baseCas.getInitialView();  // done for side effect of creating the initial view if not present
+//    // must be done before the next line, because it sets the
+//    // viewCount to 1.
+//    baseCas.setViewCount(numViews); // total number of views
+//    
+//    int fsIndexIdx = 2;
+//    for (int viewNbr = 1; viewNbr <= numViews; viewNbr++) {
+//      CASImpl view = (viewNbr == 1) ? (CASImpl) baseCas.getInitialView() : (CASImpl) baseCas.getView(viewNbr);
+//      if (view != null) {
+//        fsIndexIdx += (1 + viewAction.apply(fsIndexIdx, view));
+//        view.updateDocumentAnnotation();   // noop if sofa local data string == null
+//      } else {
+//        fsIndexIdx += 1;
+//      }
+//    }
+//  }
   
   
   /**
@@ -1097,15 +1096,27 @@ public class BinaryCasSerDes {
    * @param fsIndex - array of fsRefs and counts, for sofas, and all views
    * @param isDeltaMods - true for calls which are for delta mods - these have adds/removes
    */
-  void reinitIndexedFSs(int[] fsIndex, boolean isDeltaMods, IntFunction<TOP> getFsFromAddr) {
-    int numViews = fsIndex[0];
+  void reinitIndexedFSs(int[] fsIndex, boolean isDeltaMods, IntFunction<TOP> getFsFromAddr) {   
+    int idx = reinitIndexedFSsSofas(fsIndex, isDeltaMods, getFsFromAddr);
+    reinitIndexedFSs(fsIndex, isDeltaMods, getFsFromAddr, fsIndex[0], idx);
+  }
+  
+  void reinitIndexedFSs(int[] fsIndex, boolean isDeltaMods, IntFunction<TOP> getFsFromAddr, IntFunction<TOP> getSofaFromAddr) {
+    int idx = reinitIndexedFSsSofas(fsIndex, isDeltaMods, getSofaFromAddr);
+    reinitIndexedFSs(fsIndex, isDeltaMods, getFsFromAddr, fsIndex[0], idx);
+  }
+  
+  int reinitIndexedFSsSofas(int[] fsIndex, boolean isDeltaMods, IntFunction<TOP> getFsFromAddr ) {
     int numSofas = fsIndex[1]; // number of sofas, not necessarily the same as number of views (initial view may not have a sofa)
     int idx = 2;
     int end1 = 2 + numSofas;
     for (; idx < end1; idx++) { // iterate over all the sofas,
       baseCas.indexRepository.addFS(getFsFromAddr.apply(fsIndex[idx])); // add to base index
     }
- 
+    return idx;
+  }
+  
+  void reinitIndexedFSs(int[] fsIndex, boolean isDeltaMods, IntFunction<TOP> getFsFromAddr, int numViews, int idx) {    
     baseCas.forAllSofas(sofa -> {
       String id = sofa.getSofaID();
       if (CAS.NAME_DEFAULT_SOFA.equals(id)) { // _InitialView
@@ -1229,7 +1240,7 @@ public class BinaryCasSerDes {
   // etc.
   int[] getIndexedFSs(Obj2IntIdentityHashMap<TOP> fs2addr) {
     IntVector v = new IntVector();
-    List<TOP> fss;
+    Collection<TOP> fss;
 
     int numViews = baseCas.getViewCount();
     v.add(numViews);
@@ -1241,7 +1252,7 @@ public class BinaryCasSerDes {
 
     // Get indexes for each view in the CAS
     baseCas.forAllViews(view -> 
-        addIdsToIntVector(view.indexRepository.getIndexedFSs(), v, fs2addr));
+        addIdsToIntVector(view.getIndexedFSs(), v, fs2addr));
     return v.toArray();
   }
 
@@ -1915,9 +1926,10 @@ public class BinaryCasSerDes {
       if (feat == tsi.sofaString) {
         if (fixups4forwardFsRefs != null) {
           // has to be deferred because it updates docAnnot which might not be deser yet.
+          //   TODO no longer needed, calls the version which doesn't update docAnnot 9/2017
           Sofa capturedSofa = sofa;
           String capturedString = s;
-          fixups4forwardFsRefs.add(() -> capturedSofa.setLocalSofaData(capturedString));
+          fixups4forwardFsRefs.add(() -> capturedSofa.setLocalSofaDataNoDocAnnotUpdate(capturedString));
         } else {
           sofa.setLocalSofaData(s);
         }

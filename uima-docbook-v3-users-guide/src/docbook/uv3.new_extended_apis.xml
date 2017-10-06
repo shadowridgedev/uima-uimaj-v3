@@ -116,7 +116,7 @@ under the License.
     </para> 
     
     <para>
-      A new set of methods on UIMA built-in lists, <code>createNonEmptyNode() and getEmptyList()</code>, 
+      A new set of methods on UIMA built-in lists, <code>createNonEmptyNode() and emptyList()</code>, 
       creates a non-empty node of the type, or retrieves a (shared) empty node of the type.  
       These methods are not static, and create or get the instance in the same CAS as the object instance.
       These methods are callable on both the empty and non-empty node instances, or on their shared
@@ -129,9 +129,9 @@ under the License.
       a corresponding UIMA built-in list or array populated with items from the array_source.
     </para>
     
-    <para>For UIMA Lists and Arrays, the CAS and JCas has getEmptyXXXList/Array methods, which return
+    <para>For UIMA Lists and Arrays, the CAS and JCas has emptyXXXList/Array methods, which return
       a shared instance of the immutable empty object.
-      The Cas and JCas have generic getEmptyArray/List, taking an argument JCas class identifying the type, 
+      The Cas and JCas have generic emptyArray/List, taking an argument JCas class identifying the type, 
       e.g.  FloatArray.class, StringList.class, etc.
     </para>
         
@@ -178,6 +178,11 @@ under the License.
         <listitem>
           <para>
             <code>getLength()</code> walks the list to compute its length
+          </para>
+        </listitem>
+        <listitem>
+          <para>
+            <code>emptyList</code> returns a shared instance of the empty list of the same type, in the same CAS
           </para>
         </listitem>
       </itemizedlist>
@@ -294,6 +299,21 @@ public final static String _FeatName_sofaURI    = "sofaURI";</programlisting>
   <section id="uv3.new_extended_apis.other">
     <title>Other changes</title>
     
+    <para>The convenience methods in the JCas have been duplicated in the CAS, including <code>getAllIndexFS</code>.</para>
+    
+    <para>New methods <code>getIndexedFSs(Type)</code> and <code>getIndexedFSs(MyJCas.class)</code> return 
+    unmodifiable, unordered Collections of all indexed Feature Structures of the specified type and its subtypes in 
+    this CAS's view.  This collection can be
+    used in a Java extended-for loop construction. <code>getIndexedFSs()</code> is the same but is for all Feature Structures,
+    regardless of type.  These are methods on the CAS, JCas, FSIndexRepository
+    interfaces, and return the Feature Structures of the specified type (including subtypes).</para>
+    
+    <para>The TypeSystemMgr Interface has a variation of the <code>commit</code> method, which has a parameter 
+      that specifies the class loader to be used when loading JCas class.  This should be used whenever there are
+      user-specified JCas classes associated with the type system.  If not specified, it defaults to the class
+      loader used to load the UIMA framework.
+    </para>
+      
     <para>The CAS interface has additional convenience method to get the Annotation index:  <code>getAnnotationIndex()</code>.
     </para>
         
@@ -303,6 +323,10 @@ public final static String _FeatName_sofaURI    = "sofaURI";</programlisting>
     </para>
     
     <para>The StringArray class has a new <code>contains(a_string)</code> method.</para>
+    
+    <para>The CAS <code>protectIndexes</code> method returns an instance of AutoClosableNoException which is 
+      a subtype where the close method doesn't throw an exception.  This allows writing the try-with-resources
+      form without a catch block for Exception.</para>
     
     <para>
       Sometimes Annotators may log excessively, causing problems in production settings.

@@ -56,8 +56,7 @@ public class XMLSerializer {
   //  or the class found in any jar that has an entry: META-INF/service/javax.xml.transform.TransformerFactory
   //  or a platform default.
   
-  private static final SAXTransformerFactory transformerFactory = (SAXTransformerFactory) SAXTransformerFactory
-          .newInstance();
+  private static final SAXTransformerFactory transformerFactory = XMLUtils.createSaxTransformerFactory();
 
   private TransformerHandler mHandler;
 

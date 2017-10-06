@@ -118,6 +118,7 @@ import org.apache.uima.jcas.cas.TOP;
 import org.apache.uima.jcas.impl.JCasHashMap;
 import org.apache.uima.jcas.impl.JCasImpl;
 import org.apache.uima.jcas.tcas.Annotation;
+import org.apache.uima.util.AutoCloseableNoException;
 import org.apache.uima.util.Level;
 
 /**
@@ -1058,11 +1059,11 @@ public class CASImpl extends AbstractCas_ImplBase implements CAS, CASMgr, LowLev
   }
 
   @Override
-  public TypeSystem getTypeSystem() {
+  public final TypeSystem getTypeSystem() {
     return getTypeSystemImpl();
   }
 
-  public TypeSystemImpl getTypeSystemImpl() {
+  public final TypeSystemImpl getTypeSystemImpl() {
     if (tsi_local == null) {
       tsi_local = this.svd.tsi;
     }
@@ -1331,6 +1332,10 @@ public class CASImpl extends AbstractCas_ImplBase implements CAS, CASMgr, LowLev
     }
     return sofa;
   }
+  
+  boolean hasView(String name) {
+    return this.svd.sofaNameSet.contains(name);
+  }
 
   Sofa createInitialSofa(String mimeType) { 
     Sofa sofa = createSofa(1, CAS.NAME_DEFAULT_SOFA, mimeType);
@@ -1521,6 +1526,8 @@ public class CASImpl extends AbstractCas_ImplBase implements CAS, CASMgr, LowLev
     // at the same time
     final ClassLoader cl = getJCasClassLoader();
     synchronized (ts) {
+//      //debug
+//      System.out.format("debug committing ts %s classLoader %s%n", ts.hashCode(), cl);
       if (!ts.isCommitted()) {
         TypeSystemImpl tsc = ts.commit(getJCasClassLoader());
         if (tsc != ts) {
@@ -1784,12 +1791,12 @@ public class CASImpl extends AbstractCas_ImplBase implements CAS, CASMgr, LowLev
    * @param fi -
    * @param setter -
    */
-  public void setWithJournal(FeatureStructureImplC fs, FeatureImpl fi, Runnable setter) {
+  public final void setWithJournal(FeatureStructureImplC fs, FeatureImpl fi, Runnable setter) {
     setter.run();
     maybeLogUpdate(fs, fi);
   }
   
-  public boolean isLoggingNeeded(FeatureStructureImplC fs) {
+  public final boolean isLoggingNeeded(FeatureStructureImplC fs) {
     return this.svd.trackingMark != null && !this.svd.trackingMark.isNew(fs._id);
   }
   
@@ -1819,7 +1826,7 @@ public class CASImpl extends AbstractCas_ImplBase implements CAS, CASMgr, LowLev
    * @param startingIndex -
    * @param length number of consequtive items
    */
-  public void maybeLogArrayUpdates(FeatureStructureImplC fs, int startingIndex, int length) {
+  public final void maybeLogArrayUpdates(FeatureStructureImplC fs, int startingIndex, int length) {
     if (isLoggingNeeded(fs)) {
       this.logFSUpdate((TOP) fs, null, startingIndex, length);
     }
@@ -1896,12 +1903,44 @@ public class CASImpl extends AbstractCas_ImplBase implements CAS, CASMgr, LowLev
   }
   
   /**
+   * internal use - special setter for setting feature values, including
+   *   special handling if the feature is for the sofaArray,
+   *   when deserializing
+   * @param fs - 
+   * @param feat -
+   * @param value -
+   */
+  public static void setFeatureValueMaybeSofa(TOP fs, FeatureImpl feat, TOP value) {
+    if (fs instanceof Sofa) {
+      assert feat.getCode() == sofaArrayFeatCode;
+      ((Sofa)fs).setLocalSofaData(value);
+    } else {
+      fs.setFeatureValue(feat, value);
+    }
+  }
+  
+  /**
+   * Internal use, for cases where deserializing - special case setting sofString to skip updating the document annotation
+   * @param fs -
+   * @param feat -
+   * @param s -
+   */
+  public static void setFeatureValueFromStringNoDocAnnotUpdate(FeatureStructureImplC fs, FeatureImpl feat, String s) {
+    if (fs instanceof Sofa && 
+        feat.getCode() == sofaStringFeatCode) {
+      ((Sofa)fs).setLocalSofaDataNoDocAnnotUpdate(s);
+    } else {
+      setFeatureValueFromString(fs, feat, s);
+    }
+  }
+  
+  /**
    * Supports setting slots to "0" for null values
    * @param fs The feature structure to update
    * @param feat the feature to update-
    * @param s the string representation of the value, could be null
    */
-  public void setFeatureValueFromString(FeatureStructureImplC fs, FeatureImpl feat, String s) {
+  public static void setFeatureValueFromString(FeatureStructureImplC fs, FeatureImpl feat, String s) {
     final TypeImpl range = feat.getRangeImpl();
     if (fs instanceof Sofa) {
       // sofa has special setters
@@ -1972,83 +2011,83 @@ public class CASImpl extends AbstractCas_ImplBase implements CAS, CASMgr, LowLev
   }
 
   // Type access methods.
-  public boolean isStringType(Type type) {
+  public final boolean isStringType(Type type) {
     return type instanceof TypeImpl_string;
   }
 
-  public boolean isAbstractArrayType(Type type) {
+  public final boolean isAbstractArrayType(Type type) {
     return isArrayType(type); 
   }
   
-  public boolean isArrayType(Type type) {
+  public final boolean isArrayType(Type type) {
     return ((TypeImpl) type).isArray();
   }
 
-  public boolean isPrimitiveArrayType(Type type) {
+  public final boolean isPrimitiveArrayType(Type type) {
     return (type instanceof TypeImpl_array) && ! type.getComponentType().isPrimitive();
   }
 
-  public boolean isIntArrayType(Type type) {
+  public final boolean isIntArrayType(Type type) {
     return (type == getTypeSystemImpl().intArrayType);
   }
 
-  public boolean isFloatArrayType(Type type) {
+  public final boolean isFloatArrayType(Type type) {
     return ((TypeImpl)type).getCode() == floatArrayTypeCode;
   }
 
-  public boolean isStringArrayType(Type type) {
+  public final boolean isStringArrayType(Type type) {
     return ((TypeImpl)type).getCode() == stringArrayTypeCode;
   }
 
-  public boolean isBooleanArrayType(Type type) {
+  public final boolean isBooleanArrayType(Type type) {
     return ((TypeImpl)type).getCode() == booleanArrayTypeCode;
   }
 
-  public boolean isByteArrayType(Type type) {
+  public final boolean isByteArrayType(Type type) {
     return ((TypeImpl)type).getCode() == byteArrayTypeCode;
   }
 
-  public boolean isShortArrayType(Type type) {
+  public final boolean isShortArrayType(Type type) {
     return ((TypeImpl)type).getCode() == byteArrayTypeCode;
   }
 
-  public boolean isLongArrayType(Type type) {
+  public final boolean isLongArrayType(Type type) {
     return ((TypeImpl)type).getCode() == longArrayTypeCode;
   }
 
-  public boolean isDoubleArrayType(Type type) {
+  public final boolean isDoubleArrayType(Type type) {
     return ((TypeImpl)type).getCode() == doubleArrayTypeCode;
   }
 
-  public boolean isFSArrayType(Type type) {
+  public final boolean isFSArrayType(Type type) {
     return ((TypeImpl)type).getCode() == fsArrayTypeCode;
   }
 
-  public boolean isIntType(Type type) {
+  public final boolean isIntType(Type type) {
     return ((TypeImpl)type).getCode() == intTypeCode;
   }
 
-  public boolean isFloatType(Type type) {
+  public final boolean isFloatType(Type type) {
     return ((TypeImpl)type).getCode() == floatTypeCode;
   }
 
-  public boolean isByteType(Type type) {
+  public final boolean isByteType(Type type) {
     return ((TypeImpl)type).getCode() == byteTypeCode;
   }
 
-  public boolean isBooleanType(Type type) {
+  public final boolean isBooleanType(Type type) {
     return ((TypeImpl)type).getCode() == floatTypeCode;
   }
 
-  public boolean isShortType(Type type) {
+  public final boolean isShortType(Type type) {
     return ((TypeImpl)type).getCode() == shortTypeCode;
   }
 
-  public boolean isLongType(Type type) {
+  public final boolean isLongType(Type type) {
     return ((TypeImpl)type).getCode() == longTypeCode;
   }
 
-  public boolean isDoubleType(Type type) {
+  public final boolean isDoubleType(Type type) {
     return ((TypeImpl)type).getCode() == doubleTypeCode;
   }
 
@@ -4032,7 +4071,7 @@ public class CASImpl extends AbstractCas_ImplBase implements CAS, CASMgr, LowLev
   
   /**
    * Generic issue:  The returned document annotation could be either an instance of 
-   *   DocumentAnnotation or an instance of Annotation - the Java cover class used for 
+   *   DocumentAnnotation or a subclass of it, or an instance of Annotation - the Java cover class used for 
    *   annotations when JCas is not being used.
    */
   @Override
@@ -4170,8 +4209,8 @@ public class CASImpl extends AbstractCas_ImplBase implements CAS, CASMgr, LowLev
 
   void setDocTextFromDeserializtion(String text) {
     if (mySofaIsValid()) {
-      SofaFS sofa = getSofaRef();  // creates sofa if doesn't already exist
-      sofa.setLocalSofaData(text);
+      Sofa sofa = getSofaRef();  // creates sofa if doesn't already exist
+      sofa.setLocalSofaDataNoDocAnnotUpdate(text);
     }
   }
 
@@ -4462,15 +4501,15 @@ public class CASImpl extends AbstractCas_ImplBase implements CAS, CASMgr, LowLev
    * protectIndexes
    * 
    * Within the scope of protectIndexes, 
-   *   feature updates are checked, and if found to be a key, and the FS is in a corruptable index,
+   *   feature updates are checked, and if found to be a key, and the FS is in a corruptible index,
    *     then the FS is removed from the indexes (in all necessary views) (perhaps multiple times
    *     if the FS was added to the indexes multiple times), and this removal is recorded on
    *     an new instance of FSsTobeReindexed appended to fssTobeAddedback.
    *     
-   *   Later, when the protectIndexes is closed, the tobe items are added back to the indies.
+   *   Later, when the protectIndexes is closed, the tobe items are added back to the indexes.
    */
   @Override
-  public AutoCloseable protectIndexes() {
+  public AutoCloseableNoException protectIndexes() {
     FSsTobeAddedback r = FSsTobeAddedback.createMultiple(this);
     svd.fssTobeAddedback.add(r);
     return r;
@@ -4724,7 +4763,7 @@ public class CASImpl extends AbstractCas_ImplBase implements CAS, CASMgr, LowLev
 //    
 //  }
   
-  public static boolean isSameCAS(CAS c1, CAS c2) {
+  public final static boolean isSameCAS(CAS c1, CAS c2) {
     CASImpl ci1 = (CASImpl) c1.getLowLevelCAS();
     CASImpl ci2 = (CASImpl) c2.getLowLevelCAS();
     return ci1.getBaseCAS() == ci2.getBaseCAS();
@@ -4751,7 +4790,7 @@ public class CASImpl extends AbstractCas_ImplBase implements CAS, CASMgr, LowLev
     }
   }
 
-  public EmptyFSList getEmptyFSList() {
+  public EmptyFSList emptyFSList() {
     if (null == svd.emptyFSList) {
       svd.emptyFSList = new EmptyFSList(getTypeSystemImpl().fsEListType, this);
     }
@@ -4759,110 +4798,110 @@ public class CASImpl extends AbstractCas_ImplBase implements CAS, CASMgr, LowLev
   }
 
   /*
-   * @see org.apache.uima.cas.CAS#getEmptyFloatList()
+   * @see org.apache.uima.cas.CAS#emptyFloatList()
    */
-  public EmptyFloatList getEmptyFloatList() {
+  public EmptyFloatList emptyFloatList() {
     if (null == svd.emptyFloatList) {
       svd.emptyFloatList = new EmptyFloatList(getTypeSystemImpl().floatEListType, this);
     }
     return svd.emptyFloatList;
   }
   
-  public EmptyIntegerList getEmptyIntegerList() {
+  public EmptyIntegerList emptyIntegerList() {
     if (null == svd.emptyIntegerList) {
       svd.emptyIntegerList = new EmptyIntegerList(getTypeSystemImpl().intEListType, this);
     }
     return svd.emptyIntegerList;
   }
   
-  public EmptyStringList getEmptyStringList() {
+  public EmptyStringList emptyStringList() {
     if (null == svd.emptyStringList) {
       svd.emptyStringList = new EmptyStringList(getTypeSystemImpl().stringEListType, this);
     }
     return svd.emptyStringList;
   }
   
-  public CommonArrayFS getEmptyArray(Type type) {
+  public CommonArrayFS emptyArray(Type type) {
     switch (((TypeImpl)type).getCode()) {
     case TypeSystemConstants.booleanArrayTypeCode :
-      return getEmptyBooleanArray();
+      return emptyBooleanArray();
     case TypeSystemConstants.byteArrayTypeCode :
-      return getEmptyByteArray();
+      return emptyByteArray();
     case TypeSystemConstants.shortArrayTypeCode :
-      return getEmptyShortArray();
+      return emptyShortArray();
     case TypeSystemConstants.intArrayTypeCode :
-      return getEmptyIntegerArray();
+      return emptyIntegerArray();
     case TypeSystemConstants.floatArrayTypeCode :
-      return getEmptyFloatArray();
+      return emptyFloatArray();
     case TypeSystemConstants.longArrayTypeCode :
-      return getEmptyLongArray();
+      return emptyLongArray();
     case TypeSystemConstants.doubleArrayTypeCode :
-      return getEmptyDoubleArray();
+      return emptyDoubleArray();
     case TypeSystemConstants.stringArrayTypeCode :
-      return getEmptyStringArray();
+      return emptyStringArray();
     case TypeSystemConstants.fsArrayTypeCode :
-      return getEmptyFSArray();
+      return emptyFSArray();
     default: throw Misc.internalError(); 
     }
   }
   
-  public FloatArray getEmptyFloatArray() {
+  public FloatArray emptyFloatArray() {
     if (null == svd.emptyFloatArray) {
       svd.emptyFloatArray = new FloatArray(this.getJCas(), 0);
     }
     return svd.emptyFloatArray;
   }
 
-  public FSArray getEmptyFSArray() {
+  public FSArray emptyFSArray() {
     if (null == svd.emptyFSArray) {
       svd.emptyFSArray = new FSArray(this.getJCas(), 0);
     }
     return svd.emptyFSArray;
   }
   
-  public IntegerArray getEmptyIntegerArray() {
+  public IntegerArray emptyIntegerArray() {
     if (null == svd.emptyIntegerArray) {
       svd.emptyIntegerArray = new IntegerArray(this.getJCas(), 0);
     }
     return svd.emptyIntegerArray;
   }
   
-  public StringArray getEmptyStringArray() {
+  public StringArray emptyStringArray() {
     if (null == svd.emptyStringArray) {
       svd.emptyStringArray = new StringArray(this.getJCas(), 0);
     }
     return svd.emptyStringArray;
   }
   
-  public DoubleArray getEmptyDoubleArray() {
+  public DoubleArray emptyDoubleArray() {
     if (null == svd.emptyDoubleArray) {
       svd.emptyDoubleArray = new DoubleArray(this.getJCas(), 0);
     }
     return svd.emptyDoubleArray;
   }
   
-  public LongArray getEmptyLongArray() {
+  public LongArray emptyLongArray() {
     if (null == svd.emptyLongArray) {
       svd.emptyLongArray = new LongArray(this.getJCas(), 0);
     }
     return svd.emptyLongArray;
   }
   
-  public ShortArray getEmptyShortArray() {
+  public ShortArray emptyShortArray() {
     if (null == svd.emptyShortArray) {
       svd.emptyShortArray = new ShortArray(this.getJCas(), 0);
     }
     return svd.emptyShortArray;
   }
   
-  public ByteArray getEmptyByteArray() {
+  public ByteArray emptyByteArray() {
     if (null == svd.emptyByteArray) {
       svd.emptyByteArray = new ByteArray(this.getJCas(), 0);
     }
     return svd.emptyByteArray;
   }
   
-  public BooleanArray getEmptyBooleanArray() {
+  public BooleanArray emptyBooleanArray() {
     if (null == svd.emptyBooleanArray) {
       svd.emptyBooleanArray = new BooleanArray(this.getJCas(), 0);
     }
@@ -4873,11 +4912,11 @@ public class CASImpl extends AbstractCas_ImplBase implements CAS, CASMgr, LowLev
    * @param rangeCode special codes for serialization use only
    * @return the empty list (shared) corresponding to the type
    */
-  public EmptyList getEmptyList(int rangeCode) {
-    return (rangeCode == CasSerializerSupport.TYPE_CLASS_INTLIST) ? getEmptyIntegerList() :
-           (rangeCode == CasSerializerSupport.TYPE_CLASS_FLOATLIST) ? getEmptyFloatList() :
-           (rangeCode == CasSerializerSupport.TYPE_CLASS_STRINGLIST) ? getEmptyStringList() :
-                                                                       getEmptyFSList();
+  public EmptyList emptyList(int rangeCode) {
+    return (rangeCode == CasSerializerSupport.TYPE_CLASS_INTLIST) ? emptyIntegerList() :
+           (rangeCode == CasSerializerSupport.TYPE_CLASS_FLOATLIST) ? emptyFloatList() :
+           (rangeCode == CasSerializerSupport.TYPE_CLASS_STRINGLIST) ? emptyStringList() :
+                                                                       emptyFSList();
   }
   
   /**
@@ -4885,20 +4924,20 @@ public class CASImpl extends AbstractCas_ImplBase implements CAS, CASMgr, LowLev
    * @param typeCode -
    * @return -
    */
-  public EmptyList getEmptyListFromTypeCode(int typeCode) {
+  public EmptyList emptyListFromTypeCode(int typeCode) {
     switch (typeCode) {
     case fsListTypeCode:
     case fsEListTypeCode:
-    case fsNeListTypeCode: return getEmptyFSList();
+    case fsNeListTypeCode: return emptyFSList();
     case floatListTypeCode:
     case floatEListTypeCode:
-    case floatNeListTypeCode: return getEmptyFloatList();
+    case floatNeListTypeCode: return emptyFloatList();
     case intListTypeCode:
     case intEListTypeCode:
-    case intNeListTypeCode: return getEmptyIntegerList();
+    case intNeListTypeCode: return emptyIntegerList();
     case stringListTypeCode:
     case stringEListTypeCode:
-    case stringNeListTypeCode: return getEmptyStringList();
+    case stringNeListTypeCode: return emptyStringList();
     default: throw new IllegalArgumentException();
     }
   }

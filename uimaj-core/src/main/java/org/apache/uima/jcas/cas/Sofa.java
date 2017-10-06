@@ -37,12 +37,12 @@ public class Sofa extends TOP implements SofaFSImpl {
   
   /* public static string for use where constants are needed, e.g. in some Java Annotations */
   public final static String _TypeName = CAS.TYPE_NAME_SOFA;
-  public final static String _FeatName_sofaNum    = "sofaNum";
-  public final static String _FeatName_sofaID     = "sofaID";
-  public final static String _FeatName_mimeType   = "mimeType";
-  public final static String _FeatName_sofaArray  = "sofaArray";
-  public final static String _FeatName_sofaString = "sofaString";
-  public final static String _FeatName_sofaURI    = "sofaURI";
+  public final static String _FeatName_sofaNum    = "sofaNum";  // int
+  public final static String _FeatName_sofaID     = "sofaID";   // string
+  public final static String _FeatName_mimeType   = "mimeType"; // string
+  public final static String _FeatName_sofaArray  = "sofaArray"; // TOP 
+  public final static String _FeatName_sofaString = "sofaString"; // string
+  public final static String _FeatName_sofaURI    = "sofaURI";    // string
 
 	public final static int typeIndexID = JCasRegistry.register(Sofa.class);
 
@@ -177,18 +177,25 @@ public class Sofa extends TOP implements SofaFSImpl {
 	}
 
 	/**
-   * @see org.apache.uima.cas.SofaFS#setLocalSofaData(String) This method is duplicated in
-   *      SofaFSImpl. Any changes should be made in both places.
+   * @see org.apache.uima.cas.SofaFS#setLocalSofaData(String) 
    */
   @Override
   public void setLocalSofaData(String aString) {
-    if (isSofaDataSet()) { throwAlreadySet("setLocalSofaData()"); }
-    _setStringValueNcWj(wrapGetIntCatchException(_FH_sofaString), aString);
-
+    setLocalSofaDataNoDocAnnotUpdate(aString);
+    
     // create or update the document annotation for this Sofa's view
     ((CASImpl)(_casView.getView(this))).updateDocumentAnnotation();
   }
 
+  /**
+   * Internal use: used by deserializers
+   * @param aString the string to update
+   */
+  public void setLocalSofaDataNoDocAnnotUpdate(String aString) {
+    if (isSofaDataSet()) { throwAlreadySet("setLocalSofaData()"); }
+    _setStringValueNcWj(wrapGetIntCatchException(_FH_sofaString), aString);    
+  }
+  
   public void setLocalSofaData(String aString, String mimeType) {
     setLocalSofaData(aString);
     setMimeType(mimeType);

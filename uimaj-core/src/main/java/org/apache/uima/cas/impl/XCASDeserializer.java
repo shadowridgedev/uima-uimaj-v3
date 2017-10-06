@@ -37,6 +37,7 @@ import org.apache.uima.internal.util.IntVector;
 import org.apache.uima.internal.util.Misc;
 import org.apache.uima.internal.util.Pair;
 import org.apache.uima.internal.util.StringUtils;
+import org.apache.uima.internal.util.XMLUtils;
 import org.apache.uima.internal.util.rb_trees.RedBlackTree;
 import org.apache.uima.jcas.cas.CommonPrimitiveArray;
 import org.apache.uima.jcas.cas.FSArray;
@@ -51,7 +52,6 @@ import org.xml.sax.SAXException;
 import org.xml.sax.SAXParseException;
 import org.xml.sax.XMLReader;
 import org.xml.sax.helpers.DefaultHandler;
-import org.xml.sax.helpers.XMLReaderFactory;
 
 /**
  * XCAS Deserializer. Takes an XCAS and reads it into a CAS.
@@ -440,7 +440,7 @@ public class XCASDeserializer {
             }
             casView = cas.getView((Sofa) (fsTree.get(Integer.parseInt(extSofaRefString)).fs));
           }
-          if (ts.docType.subsumes(type)) {
+          if (type.getCode() == TypeSystemConstants.docTypeCode) {
             fs = casView.getDocumentAnnotation();
             cas.removeFromCorruptableIndexAnyView(fs, cas.getAddbackSingle());
           } else {
@@ -509,7 +509,7 @@ public class XCASDeserializer {
         }
       }
 
-      if (ts.docType.subsumes(type)) {
+      if (type.getCode() == TypeSystemConstants.docTypeCode) {
         cas.addbackSingle(fs);
       }
       
@@ -657,7 +657,7 @@ public class XCASDeserializer {
          
           fixupToDos.add( () -> finalizeRefValue(Integer.parseInt(featVal), fs, feat));
         } else {  // is not a ref type.
-          cas.setFeatureValueFromString(fs, feat, featVal);
+          CASImpl.setFeatureValueFromStringNoDocAnnotUpdate(fs, feat, featVal);
         }
 
       }
@@ -894,7 +894,7 @@ public class XCASDeserializer {
           String featName = "_ref_" + featFullName.substring(separatorOffset + 1);
           ootsAttrs.add(new Pair(featName, Integer.toString(extId)));
         }
-        fs.setFeatureValue(fi, null);
+        CASImpl.setFeatureValueMaybeSofa(fs, fi, null);
       } else {
         // the sofa ref in annotationBase is set when the fs is created, not here
         if (fi.getCode() != TypeSystemConstants.annotBaseSofaFeatCode) { 
@@ -910,7 +910,7 @@ public class XCASDeserializer {
           
           // handle case where feature is xyz[] (an array ref, not primitive) but the value of fs is FSArray
           ts.fixupFSArrayTypes(fi.getRangeImpl(), fsInfo.fs);
-          fs.setFeatureValue(fi, fsInfo.fs);
+          CASImpl.setFeatureValueMaybeSofa(fs, fi, fsInfo.fs);
         }
       }
     }
@@ -1293,7 +1293,7 @@ public class XCASDeserializer {
    */
   public static void deserialize(InputStream aStream, CAS aCAS, boolean aLenient)
           throws SAXException, IOException {
-    XMLReader xmlReader = XMLReaderFactory.createXMLReader();
+    XMLReader xmlReader = XMLUtils.createXMLReader();
     XCASDeserializer deser = new XCASDeserializer(aCAS.getTypeSystem());
     ContentHandler handler;
     if (aLenient) {
