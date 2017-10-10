@@ -331,8 +331,15 @@ public interface ResourceManager {
   public void setExtensionClassPath(ClassLoader parent, String classpath, boolean resolveResource)
           throws MalformedURLException;
 
-  default void setExtensionClassLoader(ClassLoader parent, boolean resolveResources) {
-    ((ResourceManager_impl)this).setExtensionClassLoaderImpl(parent, resolveResources);
+  /**
+   * Set an extension class loader into the Resource Manager
+   * @param classLoader the loader to use.  If this is an instance of UIMAClassLoader, it is
+   *               used directly; otherwise, a new UIMAClassLoader with no classpath, having
+   *               the classLoader as a parent is created and used.
+   * @param resolveResources true to also use this to resolve resources
+   */
+  default void setExtensionClassLoader(ClassLoader classLoader, boolean resolveResources) {
+    ((ResourceManager_impl)this).setExtensionClassLoaderImpl(classLoader, resolveResources);
   }
   
   /**

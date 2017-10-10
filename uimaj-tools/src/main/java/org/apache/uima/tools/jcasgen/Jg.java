@@ -102,7 +102,7 @@ public class Jg {
   static final FeatureDescription[] featureDescriptionArray0 = new FeatureDescription[0];
 
   /** The Constant reservedFeatureNames. */
-  static final Collection reservedFeatureNames = new ArrayList();
+  static final Collection<String> reservedFeatureNames = new ArrayList<>();
   {
 
     reservedFeatureNames.add("Address");
@@ -125,7 +125,7 @@ public class Jg {
    * Set of types not generated from the CAS type set because they're already in existence as
    * builtins in the JCas impl. and if they're generated, the generated forms are wrong.
    */
-  static final Set noGenTypes = new HashSet();
+  static final Set<String> noGenTypes = new HashSet<>();
 
   /** The Constant casCreateProperties. */
   public static final Properties casCreateProperties = new Properties();
@@ -134,7 +134,7 @@ public class Jg {
   }
 
   /** The Constant extendableBuiltInTypes. */
-  static final Map extendableBuiltInTypes = new HashMap();
+  static final Map<String, FeatureDescription[]> extendableBuiltInTypes = new HashMap<>();
 
   // create a hash map of built-in types, where the
   // key is the fully-qualified name "uima.tcas.Annotation"
@@ -166,8 +166,8 @@ public class Jg {
     noGenTypes.add("org.apache.uima.jcas.cas.IntegerArrayList");
     noGenTypes.add("org.apache.uima.jcas.cas.FSHashSet");
     
-    for (Iterator it = builtInTypeSystem.getTypeIterator(); it.hasNext();) {
-      Type type = (Type) it.next();
+    for (Iterator<Type> it = builtInTypeSystem.getTypeIterator(); it.hasNext();) {
+      Type type = it.next();
       if (type.isFeatureFinal()) {
         noGenTypes.add(type.getName());
         continue;  // skip if feature final
@@ -288,10 +288,10 @@ public class Jg {
 
   /** The imports. */
   // Instance fields
-  final Map imports = new HashMap(); // can't be final - one per instance running
+  final Map<String, String> imports = new HashMap<>(); // can't be final - one per instance running
 
   /** The imports. */
-  final Map _imports = new HashMap();
+  final Map<String, String> _imports = new HashMap<>();
 
   /** The class path. */
   String classPath = "";
@@ -461,21 +461,21 @@ public class Jg {
    * @param outputDirectory the output directory
    * @param tds the tds
    * @param aCas the a cas
-   * @param projectPathDir the project path dir
-   * @param limitJCasGenToProjectScope the limit J cas gen to project scope
-   * @param mergedTypesAddingFeatures the merged types adding features
+   * @param pProjectPathDir the project path dir
+   * @param limitToProjectScope the limit J cas gen to project scope
+   * @param pMergedTypesAddingFeatures the merged types adding features
    * @throws IOException Signals that an I/O exception has occurred.
    */
   public void mainForCde(IMerge aMerger, IProgressMonitor aProgressMonitor, IError aError,
           String inputFile, String outputDirectory, TypeDescription[] tds, CASImpl aCas, 
-          String projectPathDir, boolean limitJCasGenToProjectScope, 
-          Map<String, Set<String>> mergedTypesAddingFeatures)
+          String pProjectPathDir, boolean limitToProjectScope, 
+          Map<String, Set<String>> pMergedTypesAddingFeatures)
           throws IOException {
     try {
       // Generate type classes by using DEFAULT templates
       mainGenerateAllTypesFromTemplates(aMerger, aProgressMonitor, aError, inputFile,
               outputDirectory, tds, aCas, JCasTypeTemplate.class,
-              projectPathDir, limitJCasGenToProjectScope, mergedTypesAddingFeatures);
+              pProjectPathDir, limitToProjectScope, pMergedTypesAddingFeatures);
       // convert thrown things to IOExceptions to avoid changing API for this
       // FIXME later
     } catch (InstantiationException e) {
@@ -504,8 +504,8 @@ public class Jg {
   // use template classes to generate code
   public void mainGenerateAllTypesFromTemplates(IMerge aMerger, IProgressMonitor aProgressMonitor,
       IError aError, String inputFile, String outputDirectory, TypeDescription[] tds,
-      CASImpl aCas, Class jcasTypeClass, // Template class
-      Class jcas_TypeClass) // Template class
+      CASImpl aCas, Class<JCasTypeTemplate> jcasTypeClass, // Template class
+      Class<JCasTypeTemplate> jcas_TypeClass) // Template class
       throws IOException, InstantiationException, IllegalAccessException {
     mainGenerateAllTypesFromTemplates(aMerger, aProgressMonitor, 
              aError, inputFile, outputDirectory, tds, aCas, 
@@ -523,26 +523,26 @@ public class Jg {
    * @param tds the tds
    * @param aCas the a cas
    * @param jcasTypeClass the jcas type class
-   * @param projectPathDir the project path dir
-   * @param limitJCasGenToProjectScope the limit J cas gen to project scope
-   * @param mergedTypesAddingFeatures the merged types adding features
+   * @param pProjectPathDir the project path dir
+   * @param limitToProjectScope the limit J cas gen to project scope
+   * @param pMergedTypesAddingFeatures the merged types adding features
    * @throws IOException Signals that an I/O exception has occurred.
    * @throws InstantiationException the instantiation exception
    * @throws IllegalAccessException the illegal access exception
    */
   public void mainGenerateAllTypesFromTemplates(IMerge aMerger, IProgressMonitor aProgressMonitor,
           IError aError, String inputFile, String outputDirectory, TypeDescription[] tds,
-          CASImpl aCas, Class jcasTypeClass, // Template class
-          String projectPathDir, boolean limitJCasGenToProjectScope,
-          Map<String, Set<String>> mergedTypesAddingFeatures) // Template class
+          CASImpl aCas, Class<JCasTypeTemplate> jcasTypeClass, // Template class
+          String pProjectPathDir, boolean limitToProjectScope,
+          Map<String, Set<String>> pMergedTypesAddingFeatures) // Template class
           throws IOException, InstantiationException, IllegalAccessException {
     this.merger = aMerger;
     this.error = aError;
     this.progressMonitor = aProgressMonitor;
     xmlSourceFileName = inputFile.replaceAll("\\\\", "/");
-    this.projectPathDir = projectPathDir;
-    this.limitJCasGenToProjectScope = limitJCasGenToProjectScope;
-    this.mergedTypesAddingFeatures = mergedTypesAddingFeatures;
+    this.projectPathDir = pProjectPathDir;
+    this.limitJCasGenToProjectScope = limitToProjectScope;
+    this.mergedTypesAddingFeatures = pMergedTypesAddingFeatures;
 
     // Generate type classes by using SPECIFIED templates
     generateAllTypesFromTemplates(outputDirectory, tds, aCas, jcasTypeClass);
@@ -747,23 +747,19 @@ public class Jg {
    * @return the string
    */
   // message: TypeName = ".....", URLs defining this type = "xxxx", "xxxx", ....
-  private String makeMergeMessage(Map m) {
+  private String makeMergeMessage(Map<String, Set<String>> m) {
     StringBuffer sb = new StringBuffer();
-    for (Iterator it = m.entrySet().iterator(); it.hasNext();) {
-      Map.Entry entry = (Map.Entry) it.next();
-      String typeName = (String) entry.getKey();
+    for (Map.Entry<String, Set<String>> entry :  m.entrySet()) {
+      String typeName = entry.getKey();
       sb.append("\n  ");
       sb.append("TypeName having merged features = ").append(typeName).append(
               "\n    URLs defining this type =");
-      Set urls = (Set) entry.getValue();
+      Set<String> urls = entry.getValue();
       boolean afterFirst = false;
-      for (Iterator itUrls = urls.iterator(); itUrls.hasNext();) {
-        if (afterFirst)
-          sb.append(",\n        ");
-        else
-          sb.append("\n        ");
+      for (String url : urls) {
+        sb.append(afterFirst ? ',' : "")
+          .append("\n        \"");
         afterFirst = true;
-        String url = (String) itUrls.next();
         sb.append('"').append(url).append('"');
       }
     }
@@ -783,13 +779,13 @@ public class Jg {
    */
   // This is also the interface for CDE
   private void generateAllTypesFromTemplates(String outputDirectory, TypeDescription[] tds,
-          CASImpl aCas, Class jcasTypeClass) throws IOException,
+          CASImpl aCas, Class<JCasTypeTemplate> jcasTypeClass) throws IOException,
           InstantiationException, IllegalAccessException {
 
     // Create instances of Template classes
     IJCasTypeTemplate jcasTypeInstance = (IJCasTypeTemplate) jcasTypeClass.newInstance();
 
-    Set generatedBuiltInTypes = new TreeSet();
+    Set<String> generatedBuiltInTypes = new TreeSet<>();
 
     this.cas = aCas;
     this.typeSystem = cas.getTypeSystem();
@@ -822,7 +818,7 @@ public class Jg {
               .getName());
       if (null != builtInFeatures) {
         generatedBuiltInTypes.add(td.getName());
-        List newFeatures = setDifference(td.getFeatures(), builtInFeatures);
+        List<FeatureDescription> newFeatures = setDifference(td.getFeatures(), builtInFeatures);
         int newFeaturesSize = newFeatures.size();
         if (newFeaturesSize > 0) {
           int newSize = builtInFeatures.length + newFeaturesSize;
@@ -1161,7 +1157,7 @@ public class Jg {
   }
 
   /** The non importable java names. */
-  private static ArrayList nonImportableJavaNames = new ArrayList(8);
+  private static ArrayList<String> nonImportableJavaNames = new ArrayList<>(8);
   static {
     nonImportableJavaNames.add("String");
     nonImportableJavaNames.add("float");
@@ -1208,7 +1204,7 @@ public class Jg {
    * @param _Type the type
    * @return the collection
    */
-  Collection collectImports(TypeDescription td, boolean _Type) {
+  Collection<String> collectImports(TypeDescription td, boolean _Type) {
     if (_Type)
       _imports.clear();
     else
@@ -1402,7 +1398,7 @@ public class Jg {
     String v = ", v";
 //    if (get_set.equals("set") && range.equals("Feature"))
 //      v = ", jcasType.ll_cas.ll_getFSRef(v)";
-    boolean isInInt = ! (range.equals("String") || range.equals("Feature") || range.equals("JavaObject"));
+//    boolean isInInt = ! (range.equals("String") || range.equals("Feature") || range.equals("JavaObject"));
     String chksfx = getCheckSuffix(get_set, range);
     //wrapGetIntCatchException(_FH_begin)
     String featOrOffset = "wrapGetIntCatchException(_FH_" + fname + ")";
@@ -1584,8 +1580,8 @@ public class Jg {
    */
   private TypeSystemDescription mergeTypeSystemImports(TypeSystemDescription tsd)
           throws ResourceInitializationException {
-    Collection tsdc = new ArrayList(1);
-    tsdc.add(tsd.clone());
+    Collection<TypeSystemDescription> tsdc = new ArrayList<>(1);
+    tsdc.add((TypeSystemDescription) tsd.clone());
     mergedTypesAddingFeatures.clear();
     TypeSystemDescription mergedTsd = CasCreationUtils.mergeTypeSystems(tsdc,
             createResourceManager(), mergedTypesAddingFeatures);
@@ -1599,8 +1595,8 @@ public class Jg {
    * @param alreadyDefinedFeatures the already defined features
    * @return the list
    */
-  List setDifference(FeatureDescription[] newFeatures, FeatureDescription[] alreadyDefinedFeatures) {
-    List result = new ArrayList();
+  List<FeatureDescription> setDifference(FeatureDescription[] newFeatures, FeatureDescription[] alreadyDefinedFeatures) {
+    List<FeatureDescription> result = new ArrayList<>();
     outerLoop: for (int i = 0; i < newFeatures.length; i++) {
       for (int j = 0; j < alreadyDefinedFeatures.length; j++) {
         if (isSameFeatureDescription(newFeatures[i], alreadyDefinedFeatures[j]))
