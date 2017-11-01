@@ -62,11 +62,12 @@ public interface ArrayFS<E extends FeatureStructure> extends CommonArrayFS<E> {
    *          Where to start copying into <code>dest</code>.
    * @param length
    *          The number of elements to copy.
+   * @param <U> the type of the array element
    * @exception ArrayIndexOutOfBoundsException
    *              If <code>srcOffset &lt; 0</code> or <code>length &gt; size()</code> or
    *              <code>destOffset + length &gt; destArray.length</code>.
    */
-  void copyToArray(int srcOffset, FeatureStructure[] dest, int destOffset, int length)
+  <U extends FeatureStructure> void copyToArray(int srcOffset, U[] dest, int destOffset, int length)
       throws ArrayIndexOutOfBoundsException;
 
   /**
@@ -85,16 +86,22 @@ public interface ArrayFS<E extends FeatureStructure> extends CommonArrayFS<E> {
    *              If <code>srcOffset &lt; 0</code> or <code>length &gt; size()</code> or
    *              <code>destOffset + length &gt; destArray.length</code>.
    */
-  <T extends E> void copyFromArray(T[] src, int srcOffset, int destOffset, int length)
+  <T extends FeatureStructure> void copyFromArray(T[] src, int srcOffset, int destOffset, int length)
       throws ArrayIndexOutOfBoundsException;
 
   /**
    * Creates a new array the this array is copied to.
-   * 
+   * Return type is FeatureStructure to be backwards compatible with V2
    * @return A Java array copy of this FS array.
    */
   FeatureStructure[] toArray();
   
-  TOP[] toArray(TOP[] a);
+  /**
+   * Populates an existing array from this FS Array.
+   * @param a the existing array
+   * @param <T> the type of the element
+   * @return the populated array
+   */
+  <T extends TOP> T[] toArray(T[] a);
 
 }

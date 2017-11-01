@@ -357,7 +357,7 @@ public class IntegerArrayList extends TOP implements
   }
   
   /**
-   * Convenience - create a IntegerArrayList from an existing FeatureStructure[]
+   * Convenience - create a IntegerArrayList from an existing array.
    * @param jcas -
    * @param a -
    * @return -
