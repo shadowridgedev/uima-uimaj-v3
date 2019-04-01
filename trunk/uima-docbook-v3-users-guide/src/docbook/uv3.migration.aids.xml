@@ -1,0 +1,159 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE chapter PUBLIC "-//OASIS//DTD DocBook XML V4.4//EN"
+"http://www.oasis-open.org/docbook/xml/4.4/docbookx.dtd"[
+<!ENTITY imgroot "images/version_3_users_guide/uv3.migration.aids/">
+<!ENTITY tp "uv3.migration.aids.">
+<!ENTITY % uimaents SYSTEM "../../target/docbook-shared/entities.ent" >  
+%uimaents;
+]>
+<!--
+Licensed to the Apache Software Foundation (ASF) under one
+or more contributor license agreements.  See the NOTICE file
+distributed with this work for additional information
+regarding copyright ownership.  The ASF licenses this file
+to you under the Apache License, Version 2.0 (the
+"License"); you may not use this file except in compliance
+with the License.  You may obtain a copy of the License at
+
+   http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing,
+software distributed under the License is distributed on an
+"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+KIND, either express or implied.  See the License for the
+specific language governing permissions and limitations
+under the License.
+-->
+<chapter id="uv3.migration.aids">
+  <title>Migration aids</title>
+    
+    <para>To aid migration, some features of UIMA V3 which might cause migration difficulties 
+      can be disabled.  Users may initially want to disable these, and get their pipelines working,
+      and then over time, re-enable these while fixing any issues that may come up, one feature
+      at a time.
+    </para> 
+    
+    <para>
+      Global JVM properties for UIMA V3 that control these are described in the table below.  
+    </para>
+  
+  <section id="uv3.migration.aids.property-table">
+    <title>Properties Table</title>
+      
+    <para>This table describes the various JVM defined properties; specify these on the Java command line
+    using <code>-Dxxxxxx</code>, where the <code>xxxxxx</code> is one of
+    the properties starting with <code>uima.</code> from the table below.</para>  
+    <informaltable frame="all" rowsep="1" colsep="1">
+     <tgroup cols="2">
+       <colspec colnum="1" colname="Title" colwidth="1*"/>
+       <colspec colnum="2" colname="Description" colwidth="3*"/>
+       
+       <spanspec spanname="fullwidth" namest="Title" nameend="Description" align="center"/>
+        
+       <tbody>
+         <row>
+           <entry><emphasis role="bold">Title</emphasis></entry>
+           <entry><emphasis role="bold">Property Name &amp; Description</emphasis></entry>
+         </row>
+
+         <!-- ******************************************************************************* -->
+         <row>
+           <entry><para>Use UIMA V2 format for toString() for Feature Structures</para></entry>
+           
+           <entry><para><code>uima.v2_pretty_print_format</code></para>
+           
+                  <para>The native v3 format for pretty printing feature structures
+                    includes an id number with each FS, and some other minor improvements.
+                    If you have code which depends on the exact format that v2 UIMA produced
+                    for the toString() operation on Feature Structures, then include this
+                    flag to revert to that format.</para></entry>
+         </row>
+         <!-- ******************************************************************************* -->
+         <row>
+           <entry><para>Disable Type System consolidation</para></entry>
+           
+           <entry><para><code>uima.disable_typesystem_consolidation</code></para>
+           
+                  <para>Default: equal Type Systems are consolidated.</para>
+                  <para>When type systems are committed, the resulting Type System (Java object) 
+                    is considered read-only, and is compared to already existing Type Systems.
+                    Existing type systems, if found, are reused.  Besides saving storage, this can
+                    sometimes improve locality of reference, and therefore, performance. 
+                    Setting this property disables this consolidation.</para></entry>
+         </row>
+
+         <!-- ******************************************************************************* -->
+         <row>
+           <entry><para>Default CASs to support V2 ID references</para></entry>
+           
+           <entry><para><code>uima.default_v2_id_references</code></para>
+           
+                  <para>In version 3, Feature Structures are managed somewhat differently from V2.</para>
+                  <itemizedlist>
+                    <listitem><para>Feature Structure creation doesn't remember a map from the id to the FS,
+                      so the LowLevelCas method getFSForRef(int) isn't supported.  (Exception: Feature Structures
+                      created with the low level API calls are findable using this).</para>
+                    </listitem>
+                    <listitem>
+                      <para>Creation of Feature Structures assign "ids" as incrementing integers.  In V2, the 
+                        "id" is the address of the Feature Structure in the v2 Heap; these ids increment by 
+                        the size of the Feature Structure on the heap.</para>
+                    </listitem>
+                    <listitem>
+                      <para>Serialization only serializes "reachable" Feature Structures.</para>
+                    </listitem>
+                  </itemizedlist>
+                  
+                  <para>When this mode is set, the behavior is modified to emulate V2's.</para>
+                  <itemizedlist>
+                    <listitem><para>Feature Structures are added to an id-to-featureStructure map.</para>
+                    </listitem>
+                    <listitem>
+                      <para>IDs are assign incrementing by the size of what the Feature Structure would have been in V2.
+                      </para>
+                    </listitem>
+                    <listitem>
+                      <para>Serialization includes unreachable Feature Structures (except for Xmi and XCAS - because
+                        this is how V2 operates))</para>
+                    </listitem>
+                  </itemizedlist>
+                  <para>This property sets the default value, per CAS, for that CAS's 
+                    <code>ll_enableV2IdRefs</code> mode to true.  This mode is is also programmatically
+                      settable, which overrides this default.</para>
+                  <para>For more details on how this setting operates and interacts with the associated APIs, 
+                    see <xref linkend="uv3.backwards_compatibility.preserve_v2_ids"/>
+                  </para>                     
+           </entry>
+         </row>
+         
+         <!-- ******************************************************************************* -->
+         <row>
+           <entry spanname="fullwidth"><emphasis role="bold">Trading off runtime checks for speed</emphasis></entry>
+         </row>
+                  
+         <row>
+           <entry><para>Disabling runtime feature validation</para></entry>
+           
+           <entry><para><code>uima.uima.disable_runtime_feature_validation</code></para>
+           
+                  <para>Once code is running correctly, you may remove this check for performance
+                    reasons by setting this property.</para></entry>
+         </row>
+
+         <row>
+           <entry><para>Disabling runtime feature <emphasis>value</emphasis> validation</para></entry>
+           
+           <entry><para><code>uima.disable_runtime_feature_value_validation</code></para>
+           
+                  <para>Default: features being set into FS features which are FSs are checked for proper type subsumption.</para>
+                  <para>Once code is running correctly, you may remove this check for performance
+                    reasons by setting this property.</para></entry>
+         </row>
+
+       </tbody>
+     </tgroup>
+   </informaltable>
+    
+  </section>
+  
+</chapter>
