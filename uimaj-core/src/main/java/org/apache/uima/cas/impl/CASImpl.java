@@ -27,7 +27,6 @@ import java.io.InputStream;
 import java.io.PrintStream;
 import java.io.PrintWriter;
 import java.io.StringWriter;
-import java.io.UnsupportedEncodingException;
 import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.MethodType;
@@ -35,11 +34,13 @@ import java.lang.invoke.MutableCallSite;
 import java.net.URL;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.BitSet;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.Deque;
 import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -137,6 +138,10 @@ import org.apache.uima.util.Level;
  */
 public class CASImpl extends AbstractCas_ImplBase implements CAS, CASMgr, LowLevelCAS, TypeSystemConstants {
 
+  private static final String DISABLE_SUBTYPE_FSARRAY_CREATION = "uima.disable_subtype_fsarray_creation";
+  static final boolean IS_DISABLE_SUBTYPE_FSARRAY_CREATION = 
+      Misc.getNoValueSystemProperty(DISABLE_SUBTYPE_FSARRAY_CREATION);
+  
   private static final String TRACE_FSS = "uima.trace_fs_creation_and_updating";
 //  public static final boolean IS_USE_V2_IDS = false;  // if false, ids increment by 1
   private static final boolean trace = false; // debug
@@ -307,7 +312,22 @@ public class CASImpl extends AbstractCas_ImplBase implements CAS, CASMgr, LowLev
       return ((FsChange)obj).fs._id == fs._id;
     }
   }
+ 
+  /**
+   * Instances are put into a Stack, to remember previous state to switch back to,
+   * when switching class loaders and locking the CAS
+   * https://issues.apache.org/jira/browse/UIMA-6057
+   */
+  static class SwitchControl {
+    final boolean wasLocked;
+    boolean wasSwitched = false;
     
+    SwitchControl(boolean wasLocked) {
+      this.wasLocked = wasLocked;
+    }
+  }
+  
+
   // fields shared among all CASes belong to views of a common base CAS
   static class SharedViewData {
     /**
@@ -504,7 +524,7 @@ public class CASImpl extends AbstractCas_ImplBase implements CAS, CASMgr, LowLev
     private EmptyStringList emptyStringList;
     
     private FloatArray emptyFloatArray;
-    private FSArray emptyFSArray;
+    private final Map<Type, FSArray> emptyFSArrayMap = new HashMap<>();
     private IntegerArray emptyIntegerArray;
     private StringArray emptyStringArray;
     private DoubleArray emptyDoubleArray;
@@ -558,8 +578,17 @@ public class CASImpl extends AbstractCas_ImplBase implements CAS, CASMgr, LowLev
      *    modify deserializers to create fss with ids the same as the serialized form (
      *      or the V2 "address" imputed from that)
      *    modify serializers to include reachables only found via id2fs table
+     *    
+     *    not static because is updated (see ll_enableV2IdRefs)
      */
     private boolean isId2Fs;
+    
+    /**
+     * a stack used to remember and restore previous state of cas lock and class loaders
+     * when switching classloaders and locking the cas
+     * https://issues.apache.org/jira/browse/UIMA-6057
+     */
+    private final Deque<SwitchControl> switchControl = new ArrayDeque<>();
     
     /******************************************************************************************
      * C A S   S T A T E    management                                                        *
@@ -592,9 +621,15 @@ public class CASImpl extends AbstractCas_ImplBase implements CAS, CASMgr, LowLev
     
     private volatile Thread current_one_thread_access = null;
     
-    private void updateCallSite(MutableCallSite c, MethodHandle mh, MutableCallSite[] cs) {
-      c.setTarget(mh);
-      MutableCallSite.syncAll(cs);
+    private void updateCallSite(boolean desired_state, MethodHandle tester, MutableCallSite c, MethodHandle mh, MutableCallSite[] cs) {
+      try {
+        if (((boolean)tester.invokeExact()) != desired_state) {
+          c.setTarget(mh);
+          MutableCallSite.syncAll(cs);
+        }
+      } catch (Throwable e) {
+        Misc.internalError(e);
+      }
     }
     
     private synchronized boolean setCasState(CasState state, Thread thread) {
@@ -607,13 +642,19 @@ public class CASImpl extends AbstractCas_ImplBase implements CAS, CASMgr, LowLev
          {
             break;  // ignore readonly if no-access is set
         }
-          updateCallSite(is_updatable_callsite, mh_return_false, is_updatable_callsites);
+          updateCallSite(false, is_updatable, is_updatable_callsite, mh_return_false, is_updatable_callsites);
           break;
         case NO_ACCESS:
           current_one_thread_access = thread;
           MethodHandle mh = CasState.produce_one_thread_access_test(thread);
-          updateCallSite(is_updatable_callsite, mh, is_updatable_callsites);
-          updateCallSite(is_readable_callsite, mh, is_readable_callsites);
+          boolean b = true; // value ignored, needed to avoid compile warning
+          try {
+            b = (boolean) mh.invokeExact();
+          } catch (Throwable e) {
+            Misc.internalError(e);
+          }
+          updateCallSite(b, is_updatable, is_updatable_callsite, mh, is_updatable_callsites);
+          updateCallSite(b, is_readable, is_readable_callsite, mh, is_readable_callsites);
           break;
         default:
         }
@@ -629,12 +670,12 @@ public class CASImpl extends AbstractCas_ImplBase implements CAS, CASMgr, LowLev
           if (casState.contains(CasState.NO_ACCESS)) {
             break;
         } 
-          updateCallSite(is_updatable_callsite, mh_return_true, is_updatable_callsites);
+          updateCallSite(true, is_updatable, is_updatable_callsite, mh_return_true, is_updatable_callsites);
           break;
         case NO_ACCESS:
           current_one_thread_access = null;
-          updateCallSite(is_updatable_callsite, mh_return_true, is_updatable_callsites);
-          updateCallSite(is_readable_callsite, mh_return_true, is_readable_callsites);
+          updateCallSite(true, is_updatable, is_updatable_callsite, mh_return_true, is_updatable_callsites);
+          updateCallSite(true, is_readable, is_readable_callsite, mh_return_true, is_readable_callsites);
           break;
         default:
         }
@@ -704,7 +745,7 @@ public class CASImpl extends AbstractCas_ImplBase implements CAS, CASMgr, LowLev
       emptyStringList = null;
       
       emptyFloatArray = null;
-      emptyFSArray = null;
+      emptyFSArrayMap.clear();
       emptyIntegerArray = null;
       emptyStringArray = null;
       emptyDoubleArray = null;
@@ -714,8 +755,8 @@ public class CASImpl extends AbstractCas_ImplBase implements CAS, CASMgr, LowLev
       emptyBooleanArray = null;
   
       current_one_thread_access = null;
-      updateCallSite(is_updatable_callsite, mh_return_true, is_updatable_callsites);
-      updateCallSite(is_readable_callsite, mh_return_true, is_readable_callsites);
+      updateCallSite(true, is_updatable, is_updatable_callsite, mh_return_true, is_updatable_callsites);
+      updateCallSite(true, is_readable, is_readable_callsite, mh_return_true, is_readable_callsites);
       
       clearNonSharedInstanceData();
       
@@ -789,8 +830,9 @@ public class CASImpl extends AbstractCas_ImplBase implements CAS, CASMgr, LowLev
       traceFSid = 0;
       if (traceFSs) {
         traceFScreationSb.setLength(0);
-    }
+      }
       componentInfo = null; // https://issues.apache.org/jira/browse/UIMA-5097
+      switchControl.clear();  //  https://issues.apache.org/jira/browse/UIMA-6057
     }
     
     private void flushIndexRepositoriesAllViews() {
@@ -835,7 +877,12 @@ public class CASImpl extends AbstractCas_ImplBase implements CAS, CASMgr, LowLev
       trackingMarkList = null;
     }
     
-    void switchClassLoader(ClassLoader newClassLoader) {
+    // switches ClassLoader but does not lock CAS
+    void switchClassLoader(ClassLoader newClassLoader, boolean wasLocked) {
+      //    https://issues.apache.org/jira/browse/UIMA-6057
+      SwitchControl switchControlInstance = new SwitchControl(wasLocked);  
+      switchControl.push(switchControlInstance);
+      
       if (null == newClassLoader) { // is null if no cl set
         return;
       }
@@ -848,6 +895,7 @@ public class CASImpl extends AbstractCas_ImplBase implements CAS, CASMgr, LowLev
         // System.out.println("Switching to new class loader");
         previousJCasClassLoader = jcasClassLoader;
         jcasClassLoader = newClassLoader;
+        switchControlInstance.wasSwitched = true;
         generators = tsi.getGeneratorsForClassLoader(newClassLoader, true); // true - isPear
         
         assert null == id2tramp;  // is null outside of a pear
@@ -861,15 +909,18 @@ public class CASImpl extends AbstractCas_ImplBase implements CAS, CASMgr, LowLev
       }
     }
     
-    void restoreClassLoader() {
+    void restoreClassLoader(boolean empty_switchControl, SwitchControl switchControlInstance) {
       if (null == previousJCasClassLoader) {
         return;
       }
-      // System.out.println("Switching back to previous class loader");
-      jcasClassLoader = previousJCasClassLoader;
-      previousJCasClassLoader = null;
-      generators = baseGenerators;
-      id2tramp = null;
+      
+      if ((empty_switchControl || switchControlInstance.wasSwitched) && previousJCasClassLoader != jcasClassLoader) {
+        // System.out.println("Switching back to previous class loader");
+        jcasClassLoader = previousJCasClassLoader;
+        previousJCasClassLoader = null;
+        generators = baseGenerators;
+        id2tramp = null;
+      }
     }
     
     /**
@@ -1017,6 +1068,11 @@ public class CASImpl extends AbstractCas_ImplBase implements CAS, CASMgr, LowLev
   // package protected to let other things share this info
   final SharedViewData svd; // shared view data
 
+  // public only for cross package access
+  public boolean isCasLocked() {
+    return ! svd.flushEnabled;
+  }
+  
   /** The index repository. Referenced by XmiCasSerializer */
   FSIndexRepositoryImpl indexRepository;
 
@@ -1423,7 +1479,12 @@ public class CASImpl extends AbstractCas_ImplBase implements CAS, CASMgr, LowLev
       default: throw Misc.internalError();
       }
     }
-    return (TOP) createArrayFS(array_type, arrayLength);
+//    return (TOP) createArrayFS(/* array_type, */ arrayLength);  // for backwards compat w/ v2, don't create typed arrays
+    if (IS_DISABLE_SUBTYPE_FSARRAY_CREATION) {
+      return (TOP) createArrayFS(arrayLength);
+    } else {
+      return (TOP) createArrayFS(array_type, arrayLength);
+    }
   }
 
   /* 
@@ -1817,7 +1878,7 @@ public class CASImpl extends AbstractCas_ImplBase implements CAS, CASMgr, LowLev
 
   @Override
   public void reset() {
-    if (!this.svd.flushEnabled) {
+    if (isCasLocked()) {
       throw new CASAdminException(CASAdminException.FLUSH_DISABLED);
     }
     if (this == this.svd.baseCAS) {
@@ -3792,6 +3853,10 @@ public JCasImpl getJCasImpl() {
   public void setJCasClassLoader(ClassLoader classLoader) {
     this.svd.jcasClassLoader = classLoader;
   }
+  
+  public void switchClassLoader(ClassLoader newClassLoader, boolean wasLocked) {
+    this.svd.switchClassLoader(newClassLoader, wasLocked);
+  }
 
   // Internal use only, public for cross package use
   // Assumes: The JCasClassLoader for a CAS is set up initially when the CAS is
@@ -3811,9 +3876,10 @@ public JCasImpl getJCasImpl() {
   }
 
   public void switchClassLoaderLockCasCL(ClassLoader newClassLoader) {
+    boolean wasLocked = isCasLocked();
     // lock out CAS functions to which annotator should not have access
     enableReset(false);
-    svd.switchClassLoader(newClassLoader);
+    svd.switchClassLoader(newClassLoader, wasLocked);
   }
 
 //  // internal use, public for cross-package ref
@@ -3822,10 +3888,14 @@ public JCasImpl getJCasImpl() {
 //  }
 
   public void restoreClassLoaderUnlockCas() {
-    // unlock CAS functions
-    enableReset(true);
+    boolean empty_switchControl = this.svd.switchControl.isEmpty();
+    SwitchControl switchControlInstance = empty_switchControl ? null :this.svd.switchControl.pop();
+    if (empty_switchControl || ! switchControlInstance.wasLocked) {
+      // unlock CAS functions
+      enableReset(true);
+    }
     // this might be called without the switch ever being called
-    svd.restoreClassLoader();
+    svd.restoreClassLoader(empty_switchControl, switchControlInstance);
 
   }
   
@@ -4810,8 +4880,8 @@ public JCasImpl getJCasImpl() {
    */
   @Override
   public Marker createMarker() {
-    if (!this.svd.flushEnabled) {
-	  throw new CASAdminException(CASAdminException.FLUSH_DISABLED);
+    if (isCasLocked()) {
+	    throw new CASAdminException(CASAdminException.FLUSH_DISABLED);
   	}
   	this.svd.trackingMark = new MarkerImpl(this.getLastUsedFsId() + 1, 
   			this);
@@ -5104,11 +5174,14 @@ public FloatArray emptyFloatArray() {
   }
 
   @Override
-public <T extends FeatureStructure> FSArray<T> emptyFSArray() {
-    if (null == svd.emptyFSArray) {
-      svd.emptyFSArray = new FSArray<T>(this.getJCas(), 0);
-    }
-    return svd.emptyFSArray;
+  public <T extends FeatureStructure> FSArray<T> emptyFSArray() {
+    return emptyFSArray(null);
+  }
+  
+  public <T extends FeatureStructure> FSArray<T> emptyFSArray(Type type) {
+    return svd.emptyFSArrayMap.computeIfAbsent(type, t -> (t == null) 
+        ? new FSArray(this.getJCas(), 0)
+        : new FSArray((TypeImpl) getTypeSystemImpl().getArrayType(type), this, 0));
   }
   
   @Override

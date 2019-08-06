@@ -34,7 +34,7 @@
 <a href="#list.issues">List of JIRA Issues Fixed in this Release</a><br/>
 </p>  
         
-<h2><a id="what.is.uima">1. What is UIMA?</a></h2>
+<h2><a id="what.is.uima">What is UIMA?</a></h2>
 
      <p>
   			Unstructured Information Management applications are
@@ -81,7 +81,9 @@
 
 <h2><a id="major.changes">Major Changes in this Release</a></h2>
 
-<p>Version 3.1.0 is a minor update to 3.0.1.</p>
+<p>Version 3.1.0 is a minor update to 3.0.2, mainly bug fixes.
+The major version was updated because the generated JCas classes 
+now include for FSArrays, the generic type of the component, if known.</p>
 <p>
 When migrating from v2, if non-built-in JCas cover classes are being used,
 a one-time regeneration or migration step is required for these.  
@@ -111,37 +113,21 @@ popular logging APIs</li>
 
 <p>Please read the Version 3 users guide for more details.</p>
 
-<p>Specific changes in this release that track the same changes in version 2.10.3 include</p>
+<p>Specific changes in release 3.1.0 versus 3.0.2 include</p>
 <ul>
-  <li>The code and the build 
-was adjusted to compile using both Java 8 and Java 11.</li>
-<li>The class loading when using the UIMA Class Loader now will first try loading
-from that class loader's URL list, and if not found will try using the
-Context Class Loader (if set), and if not found, then will default to 
-how it previously searched for classes.
-Previously the Context Class Loader was never consulted.</li>
-<li>Fixed PEAR installation to no longer lock files.</li>
-<li>Pear Specifier parameters now passed to the wrapped Analysis Engine</li>
-<li>Implemented a destroy() method for ResourceManager which closes its UIMAClassLoader</li>
-</ul>
-
-<p>Specific changes in release 3.1.0 versus 3.0.1 include</p>
-<ul>
-  <li>supporting additional JCas use cases, where (due to changes in type systems) some feature might migrate
-      over time from subclasses to superclasses.</li>
-  <li>removing some changes to APIs so the v3 APIs more closely match v2 for binary compatibility.
-      Binary compatibility improves the ability to run using UIMA v3 without recompiling classes / Jars
-      built using UIMA v2 (except for JCas classes).</li>
+  <li>Fixed a problem preventing the Component Descriptor editor from running with the lastest Eclipse 2019-6</li>
+  <li>Fixed a bug on deserialization of typed arrays edge case</li>
+  <li>Better support for control of class loader switching when running sub-pipelines, including PEARs</li>
+  <li>better support for shared 0-length typed FSArrays</li>
+  <li>Fixed a bug in Internationalized Messaging in PEARs and other contexts, edge case.</li>
+  <li>JCasGen now generates FSArray values with generic types, if the component type is specified.</li>
 </ul>
  
 <h3>API changes</h3>
 
- <p>Jira issue https://issues.apache.org/jira/browse/UIMA-5869 changed an exception that is thrown if
- a CAS View is missing, from an unchecked exception to a checked exception, which matches what the 
- JavaDoc for this has always indicated.  This may require an adjustment to user code.
  <p>There is an API compatibility report covering the non-internal APIs;
    see <a href="api-change-report.html">change report</a> for the list of API changes
-   since version 3.0.1.
+   since version 3.0.2.
  </p>
  
 <h2><a id="list.issues">Full list of JIRA Issues affecting this Release</a></h2>

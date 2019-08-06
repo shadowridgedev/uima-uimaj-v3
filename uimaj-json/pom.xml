@@ -30,9 +30,9 @@
   <description>JSON support for UIMA SDK</description>
   
   <scm>
-    <connection>scm:svn:http://svn.apache.org/repos/asf/uima/uv3/uimaj-v3/tags/uimaj-3.1.0/uimaj-json</connection>
+    <connection>scm:svn:https://svn.apache.org/repos/asf/uima/uv3/uimaj-v3/tags/uimaj-3.1.0/uimaj-json</connection>
     <developerConnection>scm:svn:https://svn.apache.org/repos/asf/uima/uv3/uimaj-v3/tags/uimaj-3.1.0/uimaj-json</developerConnection>
-    <url>http://svn.apache.org/viewvc/uima/uv3/uimaj-v3/tags/uimaj-3.1.0/uimaj-json</url>
+    <url>https://svn.apache.org/viewvc/uima/uv3/uimaj-v3/tags/uimaj-3.1.0/uimaj-json</url>
   </scm>
   
   <properties>
@@ -76,7 +76,7 @@
 	            <execution>
 	              <id>default-cli</id>
 	              <configuration>
-	                <excludes>
+	                <excludes combine.children="append">
 	                  <exclude>release.properties</exclude> <!-- generated file -->
 	                  <exclude>src/test/resources/CasSerialization/expected/json/*.txt</exclude>                  
                     <exclude>src/test/resources/CasSerialization/expected/xmi/*.xml</exclude>                  
